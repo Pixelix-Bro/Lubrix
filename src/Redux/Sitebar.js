@@ -7,11 +7,11 @@ const lubrix = createSlice({
   },
 
   reducers: {
-    toggle: (state) => {
-      return (state.value = !state.value)
+    Opens: (state) => {
+      state.value = !state.value
     },
   },
 })
 
-export const { toggle } = lubrix
+export const { Opens } = lubrix.actions
 export default lubrix.reducer
