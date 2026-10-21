@@ -1,3 +1,21 @@
-export default function App() {
-  return <div>App</div>
+import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import Layout from './layout/Layout'
+import Home from './pages/Home'
+
+function App() {
+  const router = createBrowserRouter([
+    {
+      path: '/',
+      element: <Layout />,
+      children: [
+        {
+          index: true,
+          element: <Home />,
+        },
+      ],
+    },
+  ])
+  return <RouterProvider router={router} />
 }
+
+export default App
