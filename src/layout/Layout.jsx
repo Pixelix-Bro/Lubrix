@@ -4,7 +4,7 @@ import SiteBar from '../components/SiteBar'
 import Top from '../components/Top'
 export default function Layout() {
   return (
-    <div>
+    <div id='layout'>
       <Top />
       <div className="flex max-w-screen">
         <SiteBar />
