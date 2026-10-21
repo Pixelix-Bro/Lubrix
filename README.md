@@ -1,10 +1,10 @@
-# moyli.uz
+# Lubrix
 
-**moyli.uz** is a CRM SaaS platform designed to help automotive service businesses manage customers, vehicles, and oil change services efficiently.
+**Lubrix** is a CRM SaaS platform designed to help automotive service businesses manage customers, vehicles, and oil change services efficiently.
 
 ## Overview
 
-moyli.uz helps automotive service centers manage customer records, track vehicle service history, monitor oil change intervals, and send automatic reminders when the next service is due.
+Lubrix helps automotive service centers manage customer records, track vehicle service history, monitor oil change intervals, and send automatic reminders when the next service is due.
 
 ## Features
 
