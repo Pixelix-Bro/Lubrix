@@ -1,19 +1,42 @@
-# React + Vite
+# moyli.uz
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**moyli.uz** is a CRM SaaS platform designed to help automotive service businesses manage customers, vehicles, and oil change services efficiently.
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+moyli.uz helps automotive service centers manage customer records, track vehicle service history, monitor oil change intervals, and send automatic reminders when the next service is due.
 
-## React Compiler
+## Features
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+- Customer management
+- Vehicle registration and management
+- Service history tracking
+- Oil change interval monitoring
+- Automated SMS reminders
+- Telegram bot integration
+- Service center location discovery
+- Multi-branch management
+- Business dashboard and analytics
+- SaaS subscription management
 
-Note: This will impact Vite dev & build performances.
-You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
+## Target Audience
 
-## Expanding the ESLint configuration
+- Independent automotive service centers
+- Oil change service businesses
+- Multi-branch automotive service networks
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Project Goals
+
+- Simplify automotive service management
+- Improve customer retention
+- Automate oil change reminders
+- Help businesses manage multiple service locations
+- Build a scalable platform for the global automotive service industry
+
+## Project Status
+
+Currently in development.
+
+## License
+
+To be determined.
