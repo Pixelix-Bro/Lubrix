@@ -6,7 +6,7 @@ export default function Home() {
   }, [])
   return (
     <div>
-      <img src={img} alt="" />
+      <img  className='w-[400px]' src={img} alt="" />
     </div>
   )
 }
