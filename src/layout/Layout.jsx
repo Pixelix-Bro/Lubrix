@@ -2,16 +2,31 @@ import { useSelector } from 'react-redux'
 import { Outlet } from 'react-router-dom'
 import SiteBar from '../components/SiteBar'
 import Top from '../components/Top'
+
 export default function Layout() {
-  const value = useSelector((state) => state.sidebar.value)
+  const isSidebarCollapsed = useSelector((state) => state.sidebar.value)
+  const theme = useSelector((state) => state.themes.theme)
   return (
-    <div id="layout" className="flex flex-col relative">
+    <div className={`min-h-screen ${theme ? 'bg-surface text-white' : 'bg-gray-50'} transition-all duration-200`}>
       <Top />
-      <div className="flex max-w-screen">
+
+      <div className="flex">
         <SiteBar />
-        <div className={`absolute top-[67px] ${value ? 'w-[96%]': 'w-[87%]'} right-0 -z-10 pl-[10px]`}>
+
+        <main
+          className={`
+            mt-[63px]
+            min-w-0
+            flex-1
+            p-4
+            transition-all
+            duration-300
+
+            ${isSidebarCollapsed ? 'lg:ml-[4%]' : 'lg:ml-[13%]'}
+          `}
+        >
           <Outlet />
-        </div>
+        </main>
       </div>
     </div>
   )
