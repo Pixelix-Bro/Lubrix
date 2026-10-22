@@ -7,3 +7,25 @@
   font-style: normal;
   font-display: swap;
 }
+
+@theme {
+  --color-background: #080c14;
+  --color-surface: #0f172a;
+  --color-surface-hover: #1e293b;
+  --color-primary: #2563eb;
+  --color-accent: #3b82f6;
+  --color-accent-light: #60a5fa;
+  --color-text-primary: #f8fafc;
+  --color-text-muted: #94a3b8;
+  --color-border: #1e3a5f;
+}
+
+.grandes {
+  background: linear-gradient(transparent, white);
+}
+
+#input::placeholder {
+  font-family: title;
+  word-spacing: 5px;
+  letter-spacing: 2px;
+}

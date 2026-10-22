@@ -1,16 +1,29 @@
 import { useSelector } from 'react-redux'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 export default function SiteBarButton({ p, n, i }) {
-  const value = useSelector((state) => state.sidebar.value)
+  const isCollapsed = useSelector((state) => state.sidebar.value)
+  const location = useLocation()
+  const isActive = location.pathname === p
 
   return (
     <Link
       to={p}
-      className="flex items-center justify-center gap-[5px] !text-[18px] text-start p-[10px] hover:text-yellow-500 hover:bg-yellow-100 transition-all duration-200 rounded-xl"
+      title={isCollapsed ? n : undefined}
+      className={`
+        flex min-w-0 items-center gap-3 rounded-xl p-3
+        transition-colors duration-200
+        ${
+          isActive
+            ? 'bg-amber-400/15 backdrop-blur-3xl text-amber-400'
+            : 'text-black hover:bg-amber-400/10 hover:text-amber-300'
+        }
+        ${isCollapsed ? 'justify-center' : ''}
+      `}
     >
-      {i}
-      {!value && <span>{n}</span>}
+      <span className="shrink-0 font-bold">{i}</span>
+
+      {!isCollapsed && <span className="truncate font-bold">{n}</span>}
     </Link>
   )
 }
