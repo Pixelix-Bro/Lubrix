@@ -1,28 +1,36 @@
 import { useSelector } from 'react-redux'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import SiteBar from '../components/SiteBar'
 import Top from '../components/Top'
 
 export default function Layout() {
-  const isSidebarCollapsed = useSelector((state) => state.sidebar.value)
-  const theme = useSelector((state) => state.themes.theme)
-  return (
-    <div className={`min-h-screen ${theme ? 'bg-surface text-white' : 'bg-gray-50'} transition-all duration-200`}>
-      <Top />
+  const location = useLocation()
 
-      <div className="flex">
-        <SiteBar />
+  const isSidebarCollapsed = useSelector((state) => state.sidebar.value)
+
+  const theme = useSelector((state) => state.themes.theme)
+
+  const isAuthPage = ['/login', '/register'].includes(location.pathname)
+
+  return (
+    <div
+      className={`
+        min-h-screen w-full
+        transition-colors duration-200
+        ${theme ? 'bg-surface text-text-primary' : 'bg-gray-50 text-gray-900'}
+      `}
+    >
+      {!isAuthPage && <Top />}
+
+      <div className="flex min-h-screen">
+        {!isAuthPage && <SiteBar />}
 
         <main
           className={`
-            mt-[63px]
-            min-w-0
-            flex-1
-            p-4
-            transition-all
-            duration-300
-
-            ${isSidebarCollapsed ? 'lg:ml-[4%]' : 'lg:ml-[13%]'}
+            min-w-0 flex-1
+            p-4 pt-[79px]
+            transition-[margin,padding] duration-300
+            ${isAuthPage ? 'p-0 pt-0' : isSidebarCollapsed ? 'lg:ml-[4%]' : 'lg:ml-[13%]'}
           `}
         >
           <Outlet />

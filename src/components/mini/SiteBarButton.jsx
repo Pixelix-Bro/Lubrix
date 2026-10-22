@@ -16,7 +16,7 @@ export default function SiteBarButton({ p, n, i }) {
         ${
           isActive
             ? 'bg-amber-400/15 backdrop-blur-3xl text-amber-400'
-            : 'text-slate-400 hover:bg-amber-400/10 hover:text-amber-300'
+            : 'text-black hover:bg-amber-400/10 hover:text-amber-300'
         }
         ${isCollapsed ? 'justify-center' : ''}
       `}

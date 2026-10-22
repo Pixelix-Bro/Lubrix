@@ -5,7 +5,10 @@ export default function Home() {
   }, [])
   return (
     <div className="flex flex-col">
-      <h1>de</h1>
+
+      <div className="flex">
+        
+      </div>
     </div>
   )
 }

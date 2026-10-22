@@ -67,8 +67,10 @@ export default function Top() {
             type="button"
             onClick={() => setTog((res) => (!res ? 'search' : ''))}
             aria-label="Toggle search"
+            className="group"
           >
             <Search size={19} />
+           
           </button>
 
           <input
