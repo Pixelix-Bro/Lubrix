@@ -7,7 +7,7 @@ export default function Home() {
     <div className="flex flex-col">
 
       <div className="flex">
-        
+        cnjkscnjks
       </div>
     </div>
   )

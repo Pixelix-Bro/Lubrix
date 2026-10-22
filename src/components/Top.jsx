@@ -43,7 +43,7 @@ export default function Top() {
 
       ${theme ? 'bg-surface text-white' : 'bg-white'}
 
-        ${value ? 'w-[calc(100%-80px)]' : 'w-[87%]'}
+        ${value ? 'w-[calc(100%-80px)]' : 'w-[87%] '}
       `}
     >
       <div className="min-w-0">
@@ -70,7 +70,7 @@ export default function Top() {
             className="group"
           >
             <Search size={19} />
-           
+
           </button>
 
           <input

@@ -18,6 +18,7 @@ export default function Layout() {
         min-h-screen w-full
         transition-colors duration-200
         ${theme ? 'bg-surface text-text-primary' : 'bg-gray-50 text-gray-900'}
+             ${isAuthPage ? 'bg-white' : ''}
       `}
     >
       {!isAuthPage && <Top />}
