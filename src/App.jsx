@@ -2,6 +2,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import Layout from './layout/Layout'
 import Home from './pages/Home'
 import Login from './pages/Login'
+import Price from './pages/Price'
 import Register from './pages/Register'
 
 function App() {
@@ -21,6 +22,10 @@ function App() {
         {
           path: '/login',
           element: <Login />,
+        },
+        {
+          path: '/plans',
+          element: <Price />,
         },
       ],
     },

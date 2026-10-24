@@ -8,6 +8,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'dic';
+  src: url('./fonts/Orbitron/static/Orbitron-Medium.ttf') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --color-background: #080c14;
   --color-surface: #0f172a;
@@ -28,4 +36,8 @@
   font-family: title;
   word-spacing: 5px;
   letter-spacing: 2px;
+}
+
+.text-sss {
+  font-size: clamp(0.8rem, 1vw, 0.8rem);
 }

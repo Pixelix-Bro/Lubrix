@@ -1,16 +1,20 @@
+import { useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { Outlet, useLocation } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import SiteBar from '../components/SiteBar'
 import Top from '../components/Top'
-
 export default function Layout() {
+  useEffect(() => {
+    document.title = 'Lubrix | Price'
+  }, [])
   const location = useLocation()
 
   const isSidebarCollapsed = useSelector((state) => state.sidebar.value)
 
   const theme = useSelector((state) => state.themes.theme)
 
-  const isAuthPage = ['/login', '/register'].includes(location.pathname)
+  const isAuthPage = ['/login', '/register', '/plans'].includes(location.pathname)
 
   return (
     <div
@@ -21,6 +25,7 @@ export default function Layout() {
              ${isAuthPage ? 'bg-white' : ''}
       `}
     >
+      <Toaster position="top-right" theme="system" />
       {!isAuthPage && <Top />}
 
       <div className="flex min-h-screen">
