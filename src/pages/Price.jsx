@@ -26,8 +26,14 @@ export default function Price() {
 
   return (
     <div className="fixed inset-0 h-dvh w-full overflow-hidden bg-black">
-      {/* Background Video */}
-      <video loop autoPlay muted playsInline className="fixed inset-0 h-full w-full object-cover">
+      <video
+        loop
+        autoPlay
+        muted
+        playsInline
+        poster="./start/backgroundWebp.webp"
+        className="fixed inset-0 h-full w-full object-cover"
+      >
         <source src="/video/background.mp4" type="video/mp4" />
       </video>
 
