@@ -62,7 +62,7 @@ export default function Checkout() {
     }, rootRef)
     return () => ctx.revert()
   }, [])
-  const images = ['/checkout/humo.png', '/checkout/uzcard.svg', '/video/checkout.mp4']
+  const images = ['/checkout/humo.png', '/checkout/uzcard.svg']
 
   useEffect(() => {
     images.forEach((src) => {
@@ -82,7 +82,7 @@ export default function Checkout() {
         aria-hidden="true"
         className="fixed inset-0 h-full w-full object-cover motion-reduce:hidden"
       >
-        <source src="/video/checkout.mp4" type="video/mp4" />
+        <source preload="auto" src="/video/checkout.mp4" type="video/mp4" />
       </video>
 
       <div className="pointer-events-none fixed inset-x-0 top-0 z-[1] h-[200px] bg-gradient-to-b from-black to-transparent sm:h-[300px]" />
