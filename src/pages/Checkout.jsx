@@ -1,7 +1,7 @@
 import { Icon } from '@iconify/react'
 import { gsap } from 'gsap'
 import { ArrowLeft, Check, ShieldCheck } from 'lucide-react'
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import CardModal from '../components/mini/Cardinput'
 import { monthlyPlans } from '../data/root'
@@ -61,6 +61,14 @@ export default function Checkout() {
       })
     }, rootRef)
     return () => ctx.revert()
+  }, [])
+  const images = ['/checkout/humo.png', '/checkout/uzcard.svg', '/video/checkout.mp4']
+
+  useEffect(() => {
+    images.forEach((src) => {
+      const img = new Image()
+      img.src = src
+    })
   }, [])
 
   return (
