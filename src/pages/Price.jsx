@@ -24,6 +24,17 @@ export default function Price() {
 
   const plans = active === 'year' ? yearlyPlans : monthlyPlans
 
+  const images = [
+    '/loginPhoto/LoginPhoto.jpg',
+    '/loginPhoto/LoginPhoto.jpeg',
+    '/loginPhoto/LoginPhoto1.jpg',
+    '/loginPhoto/LoginPhoto2.jpg',
+  ]
+
+  images.forEach((src) => {
+    const img = new Image()
+    img.src = src
+  })
   return (
     <div className="fixed inset-0 h-dvh w-full overflow-hidden bg-black">
       <video
