@@ -32,10 +32,10 @@ export default function LoginSwiper() {
         className={`absolute bg-gradient-to-b transition-colors duration-200 from-transparent ${theme ? 'to-[#0f172a]' : 'to-white'} h-[500px] w-full bottom-0 left-0 z-50`}
       />
       <div
-        className={`absolute bg-gradient-to-b transition-colors duration-200 from-transparent ${theme ? 'to-[#0f172a]' : 'to-white'} h-[500px] -rotate-[90deg]   bottom-0 right-[-730px] w-screen top-0 z-50`}
+        className={`absolute bg-gradient-to-b transition-colors duration-200 from-transparent ${theme ? 'to-[#0f172a]' : 'to-white'} h-[500px] -rotate-[90deg]   bottom-0 right-[-720px] w-screen top-0 z-50`}
       />
       <div
-        className={`absolute bg-gradient-to-b transition-colors duration-200 from-transparent ${theme ? 'to-[#0f172a]' : 'to-white'} h-[500px] -rotate-[90deg]   bottom-0 right-[-730px] w-screen top-0 z-50`}
+        className={`absolute bg-gradient-to-b transition-colors duration-200 from-transparent ${theme ? 'to-[#0f172a]' : 'to-white'} h-[500px] -rotate-[90deg]   bottom-0 right-[-720px] w-screen top-0 z-50`}
       />
     </div>
   )

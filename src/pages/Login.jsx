@@ -12,6 +12,19 @@ export default function Login() {
   useEffect(() => {
     document.title = 'Lubrix | Login'
   }, [])
+  const images = [
+    '/loginPhoto/LoginPhoto.jpg',
+    '/loginPhoto/LoginPhoto.jpeg',
+    '/loginPhoto/LoginPhoto1.jpg',
+    '/loginPhoto/LoginPhoto2.jpg',
+  ]
+
+  useEffect(() => {
+    images.forEach((src) => {
+      const img = new Image()
+      img.src = src
+    })
+  }, [])
   return (
     <div
       className={`absolute top-0 transition-all duration-200 ${theme ? 'bg-surface' : 'bg-white'} left-0 h-screen w-screen`}

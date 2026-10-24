@@ -14,7 +14,7 @@ export default function Layout() {
 
   const theme = useSelector((state) => state.themes.theme)
 
-  const isAuthPage = ['/login', '/register', '/plans'].includes(location.pathname)
+  const isAuthPage = ['/login', '/register', '/plans', '/checkout'].includes(location.pathname)
 
   return (
     <div

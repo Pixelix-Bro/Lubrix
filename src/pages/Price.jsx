@@ -1,40 +1,34 @@
 import { gsap } from 'gsap'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { monthlyPlans, yearlyPlans } from '../data/root'
 
 export default function Price() {
   const [active, setActive] = useState('month')
   const [id, setId] = useState(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
-    gsap.from('.text-one', {
+    const animation = gsap.from('.text-one', {
       y: 100,
       opacity: 0,
       duration: 1,
       stagger: 0.15,
       ease: 'power2.out',
     })
+
+    return () => animation.kill()
   }, [])
 
   useEffect(() => {
     setId(null)
   }, [active])
 
+
   const plans = active === 'year' ? yearlyPlans : monthlyPlans
 
-  const images = [
-    '/loginPhoto/LoginPhoto.jpg',
-    '/loginPhoto/LoginPhoto.jpeg',
-    '/loginPhoto/LoginPhoto1.jpg',
-    '/loginPhoto/LoginPhoto2.jpg',
-  ]
-
-  images.forEach((src) => {
-    const img = new Image()
-    img.src = src
-  })
+  const selectedPlan = plans.find((plan) => plan.id === id)
   return (
     <div className="fixed inset-0 h-dvh w-full overflow-hidden bg-black">
       <video
@@ -42,17 +36,17 @@ export default function Price() {
         autoPlay
         muted
         playsInline
-        poster="./start/backgroundWebp.webp"
+        poster="/start/backgroundWebp.webp"
         className="fixed inset-0 h-full w-full object-cover"
       >
         <source src="/video/background.mp4" type="video/mp4" />
       </video>
 
       <div className="pointer-events-none fixed inset-x-0 top-0 z-[1] h-[200px] bg-gradient-to-b from-black to-transparent sm:h-[300px]" />
+
       <div className="relative z-10 h-full w-full overflow-x-hidden overflow-y-auto text-white">
         <button
-          type="button"
-          onClick={() => window.history.back()}
+          onClick={() => navigate(-1)}
           className="group absolute left-3 top-3 z-20 flex items-center gap-3 p-3 font-[title] text-sm tracking-[3px] sm:left-5 sm:top-5 sm:gap-5 sm:p-5 sm:text-base sm:tracking-[5px]"
         >
           <ArrowLeft
@@ -63,9 +57,13 @@ export default function Price() {
           <span className="transition-transform duration-200 group-hover:translate-x-1">BACK</span>
         </button>
 
-        {id !== null && (
+        {selectedPlan && (
           <Link
-            to="/register"
+            to="/checkout"
+            onClick={() => {
+              sessionStorage.setItem('lubrix-plan', String(selectedPlan.id))
+              sessionStorage.setItem('lubrix-billing', active)
+            }}
             className="group absolute right-3 top-3 z-20 flex items-center gap-2 p-3 font-[title] text-sm font-bold tracking-[3px] sm:right-5 sm:top-5 sm:gap-3 sm:p-5 sm:text-base sm:tracking-[5px]"
           >
             <span>NEXT</span>
@@ -76,14 +74,14 @@ export default function Price() {
             />
           </Link>
         )}
-
-        <main className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col items-center px-4 pt-24 pb-6 sm:px-6 sm:pt-28 lg:h-full lg:min-h-0 lg:justify-center lg:px-10 lg:pt-20 lg:pb-4">
+        <main className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col items-center px-4 pb-6 pt-24 sm:px-6 sm:pt-28 lg:min-h-0 lg:h-full lg:justify-center lg:px-10 lg:pb-4 lg:pt-20">
           <div className="flex w-full flex-col items-center gap-5 text-center sm:gap-6">
-            <h1 className="flex flex-wrap justify-center gap-x-2 overflow-hidden font-[title] text-[22px] font-thin tracking-[3px] sm:gap-x-3 sm:text-[30px] sm:tracking-[5px] md:text-[36px] lg:text-[40px]">
+            <h1 className="flex flex-wrap absolute top-5 justify-center gap-x-2 overflow-hidden font-[title] text-[22px] font-thin tracking-[3px] sm:gap-x-3 sm:text-[30px] sm:tracking-[5px] md:text-[36px] lg:text-[40px]">
               <span className="text-one inline-block">LUBRIX</span>
               <span className="text-one inline-block">PLANS</span>
               <span className="text-one inline-block">PRICE</span>
             </h1>
+
             <div className="flex items-center justify-center gap-3 sm:gap-5">
               <button
                 type="button"
@@ -114,22 +112,15 @@ export default function Price() {
               const selected = id === plan.id
 
               return (
-                <div
+                <button
+                  type="button"
                   key={plan.id}
                   onClick={() => setId(plan.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      setId(plan.id)
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
                   aria-pressed={selected}
-                  className={`relative flex min-w-0 cursor-pointer flex-col gap-5 overflow-hidden rounded-2xl border bg-black/30 p-5 backdrop-blur-[30px] transition-colors duration-200 sm:p-6 ${
+                  className={`relative flex min-w-0 flex-col gap-5 overflow-hidden rounded-2xl border p-5 text-left backdrop-blur-[30px] transition-colors duration-200 sm:p-6 ${
                     selected
                       ? 'border-white/70 bg-white/10'
-                      : 'border-black/60 hover:border-white/30'
+                      : 'border-white/20 bg-black/30 hover:border-white/40'
                   }`}
                 >
                   <div className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full border border-white/50 sm:right-5 sm:top-5 sm:h-[30px] sm:w-[30px]">
@@ -140,7 +131,7 @@ export default function Price() {
                     {plan.name}
                   </span>
 
-                  <span className="text-sss line-clamp-2 break-words font-[dic] tracking-[2px] sm:tracking-[3px]">
+                  <span className="line-clamp-2 break-words font-[dic] text-sss tracking-[2px] sm:tracking-[3px]">
                     {plan.description}
                   </span>
 
@@ -152,9 +143,8 @@ export default function Price() {
                     </span>
                   </div>
 
-                  <div className="border-white/30 border" />
+                  <div className="border border-white/30" />
 
-                  {/* Features */}
                   <div className="flex flex-1 flex-col gap-4">
                     {plan.features?.map((feature) => (
                       <span
@@ -162,15 +152,13 @@ export default function Price() {
                         className="flex items-start gap-3 break-words font-[dic] text-sm sm:gap-4 sm:text-base"
                       >
                         <Check size={19} className="mt-0.5 shrink-0" />
-
                         <span>{feature}</span>
                       </span>
                     ))}
                   </div>
 
-                  <div className="border-white/30 border" />
+                  <div className="border border-white/30" />
 
-                  {/* Select Plan */}
                   <div className="flex items-center justify-between gap-3 font-[title] text-sm tracking-[2px] sm:text-base sm:tracking-[3px]">
                     <span>{selected ? 'SELECTED' : 'SELECT PLAN'}</span>
 
@@ -181,10 +169,11 @@ export default function Price() {
                       }`}
                     />
                   </div>
-                </div>
+                </button>
               )
             })}
           </div>
+
           <div className="h-6 shrink-0 sm:h-10" />
         </main>
       </div>

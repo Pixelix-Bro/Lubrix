@@ -41,3 +41,8 @@
 .text-sss {
   font-size: clamp(0.8rem, 1vw, 0.8rem);
 }
+
+
+button{
+  cursor: pointer;
+}
