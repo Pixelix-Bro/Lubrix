@@ -12,7 +12,7 @@ export default function Price() {
   useEffect(() => {
     const animation = gsap.from('.text-one', {
       y: 100,
-      opacity: 0,
+      opacity: 0, 
       duration: 1,
       stagger: 0.15,
       ease: 'power2.out',
@@ -25,12 +25,11 @@ export default function Price() {
     setId(null)
   }, [active])
 
-
   const plans = active === 'year' ? yearlyPlans : monthlyPlans
 
   const selectedPlan = plans.find((plan) => plan.id === id)
   return (
-    <div className="fixed inset-0 h-dvh w-full overflow-hidden bg-black">
+    <div className="fixed font-[title] inset-0 h-dvh w-full overflow-hidden bg-black">
       <video
         loop
         autoPlay

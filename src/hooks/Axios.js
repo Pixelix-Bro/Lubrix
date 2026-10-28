@@ -1,6 +1,5 @@
-import axios from 'axios'
+import apiClient from '../services/api';
 
-export const api = axios.create({
-  baseURL: 'http://localhost:3000/',
-  timeout: 5000,
-})
+// Maintain backwards compatibility with any existing files importing `api` from `../hooks/Axios`
+export const api = apiClient;
+export default apiClient;

@@ -1,1 +1,161 @@
-{}
+{
+  "dashboard": {
+    "dateLabel": "26 oktabr, dushanba",
+    "greeting": "Xayrli kun, Admin",
+    "stats": [
+      {
+        "label": "Bugungi tushum",
+        "value": "8 450 000 so'm",
+        "delta": "+12,8%",
+        "icon": "CircleDollarSign",
+        "positive": true,
+        "note": "kechagi kunga nisbatan"
+      },
+      {
+        "label": "Xizmatlar",
+        "value": "24 ta",
+        "delta": "+4 ta",
+        "icon": "Settings2",
+        "positive": true,
+        "note": "kechagi kunga nisbatan"
+      },
+      {
+        "label": "Mijozlar",
+        "value": "18 ta",
+        "delta": "+2 ta",
+        "icon": "UsersRound",
+        "positive": true,
+        "note": "yangi mijozlar"
+      },
+      {
+        "label": "Kutilayotgan",
+        "value": "6 ta",
+        "delta": "-2 ta",
+        "icon": "Clock3",
+        "positive": false,
+        "note": "xizmat navbatida"
+      }
+    ],
+    "revenue": {
+      "Hafta": {
+        "amount": "24,8 mln",
+        "change": "+12,8%",
+        "labels": ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"],
+        "values": [38, 58, 46, 76, 55, 92, 67]
+      },
+      "Oy": {
+        "amount": "96,4 mln",
+        "change": "+8,4%",
+        "labels": ["1-hafta", "2-hafta", "3-hafta", "4-hafta"],
+        "values": [54, 72, 61, 91]
+      }
+    },
+    "reminders": [
+      {
+        "id": 1,
+        "name": "Sardor Ergashev",
+        "vehicle": "Toyota Camry · 01 E 118 EE",
+        "due": "Bugun",
+        "tone": "today"
+      },
+      {
+        "id": 2,
+        "name": "Nilufar Sobirova",
+        "vehicle": "Chevrolet Cobalt · 01 F 620 FF",
+        "due": "Ertaga",
+        "tone": "tomorrow"
+      },
+      {
+        "id": 3,
+        "name": "Bekzod Ismoilov",
+        "vehicle": "Kia Sportage · 01 G 305 GG",
+        "due": "28 okt",
+        "tone": "later"
+      }
+    ],
+    "services": [
+      {
+        "id": 1,
+        "customer": "Azizbek Karimov",
+        "vehicle": "Chevrolet Malibu 2",
+        "plate": "01 A 777 AA",
+        "service": "Moy va filtr almashtirish",
+        "time": "09:42",
+        "amount": 850000,
+        "status": "Tugallandi"
+      },
+      {
+        "id": 2,
+        "customer": "Madina Rasulova",
+        "vehicle": "Kia K5",
+        "plate": "01 B 432 BB",
+        "service": "Moy almashtirish",
+        "time": "10:18",
+        "amount": 620000,
+        "status": "Tugallandi"
+      },
+      {
+        "id": 3,
+        "customer": "Javohir Tursunov",
+        "vehicle": "Hyundai Tucson",
+        "plate": "01 C 918 CC",
+        "service": "Moy va filtr almashtirish",
+        "time": "11:05",
+        "amount": 940000,
+        "status": "Jarayonda"
+      },
+      {
+        "id": 4,
+        "customer": "Dilshod Akramov",
+        "vehicle": "Chevrolet Tracker",
+        "plate": "01 D 205 DD",
+        "service": "Diagnostika",
+        "time": "11:32",
+        "amount": 350000,
+        "status": "Kutilmoqda"
+      }
+    ]
+  },
+  "services": [
+    {
+      "id": 1,
+      "customer": "Azizbek Karimov",
+      "vehicle": "Chevrolet Malibu 2",
+      "plate": "01 A 777 AA",
+      "service": "Moy va filtr almashtirish",
+      "time": "09:42",
+      "amount": 850000,
+      "status": "Tugallandi"
+    },
+    {
+      "id": 2,
+      "customer": "Madina Rasulova",
+      "vehicle": "Kia K5",
+      "plate": "01 B 432 BB",
+      "service": "Moy almashtirish",
+      "time": "10:18",
+      "amount": 620000,
+      "status": "Tugallandi"
+    },
+    {
+      "id": 3,
+      "customer": "Javohir Tursunov",
+      "vehicle": "Hyundai Tucson",
+      "plate": "01 C 918 CC",
+      "service": "Moy va filtr almashtirish",
+      "time": "11:05",
+      "amount": 940000,
+      "status": "Jarayonda"
+    },
+    {
+      "id": 4,
+      "customer": "Dilshod Akramov",
+      "vehicle": "Chevrolet Tracker",
+      "plate": "01 D 205 DD",
+      "service": "Diagnostika",
+      "time": "11:32",
+      "amount": 350000,
+      "status": "Kutilmoqda"
+    }
+  ]
+}

@@ -143,9 +143,39 @@ const inputClass = (error) =>
 export default function CardModal({
   amount, // e.g. "249 000 UZS" (optional, shown on the pay button)
   onSubmit, // async (card) => void — send to your payment provider, never log it
-  buttonLabel = 'Pay now',
+  buttonLabel,
   method, // e.g. "Humo" (optional, shown in the header)
   onClose, // if passed, the modal is controlled by the parent: opens on mount, no trigger button
+  copy = {
+    title: 'Add your card',
+    subtitle: 'Pay with {method}',
+    close: 'Close',
+    successTitle: 'Card added',
+    successText: '{brand} ending in {digits} is ready to use.',
+    cardHolder: 'Card holder',
+    holderPlaceholder: 'NAME AS ON CARD',
+    expiry: 'Expiry date',
+    number: 'Card number',
+    numberPlaceholder: '0000 0000 0000 0000',
+    done: 'Done',
+    secure: 'Lubrix secure checkout',
+    yourCard: 'Your card',
+    summary: 'The 3-digit security code is printed on the back of your card.',
+    payNow: 'Pay now',
+    payAmount: 'Pay {amount}',
+    paySecure: 'Pay securely',
+    processing: 'Processing…',
+    cvv: 'CVV',
+    showCvv: 'Show CVV',
+    hideCvv: 'Hide CVV',
+    encryptedInfo: 'Your card details are encrypted and never stored on our servers.',
+    cardHolderPreview: 'Card holder',
+    expiresPreview: 'Expires',
+    defaultHolder: 'YOUR NAME',
+    defaultExpiry: 'MM/YY',
+    defaultCVV: '•••',
+    payFailed: 'Payment failed. Check your card details and try again.',
+  },
 }) {
   const controlled = typeof onClose === 'function'
   const reduce = useReducedMotion()
@@ -165,6 +195,7 @@ export default function CardModal({
   const [showCvv, setShowCvv] = useState(false)
   const [status, setStatus] = useState('idle') // idle | loading | success
   const [submitError, setSubmitError] = useState('')
+  const payLabel = buttonLabel || copy.payNow
 
   const triggerRef = useRef(null)
   const dialogRef = useRef(null)
@@ -291,7 +322,7 @@ export default function CardModal({
       setStatus('success')
     } catch (err) {
       setStatus('idle')
-      setSubmitError(err?.message || 'Payment failed. Check your card details and try again.')
+      setSubmitError(err?.message || copy.payFailed)
     }
   }
 
@@ -308,7 +339,7 @@ export default function CardModal({
           className="inline-flex items-center gap-3 rounded-xl bg-blue-600 px-5 py-3 text-sm font-medium text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
         >
           <CreditCard size={18} />
-          {buttonLabel}
+          {payLabel}
         </button>
       )}
 
@@ -349,16 +380,16 @@ export default function CardModal({
                         id={ids.title}
                         className="font-[title] text-lg font-thin uppercase tracking-[4px] sm:text-xl sm:tracking-[5px]"
                       >
-                        Add your card
+                        {copy.title}
                       </h2>
                       <p className="mt-2 text-sm text-white/55">
-                        {method ? `Pay with ${method}` : 'Lubrix secure checkout'}
+                        {method ? copy.subtitle.replace('{method}', method) : copy.secure}
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={close}
-                      aria-label="Close"
+                      aria-label={copy.close}
                       className="rounded-xl border border-white/40 bg-black/20 p-2.5 text-white/70 backdrop-blur-md transition hover:border-white/70 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
                     >
                       <X size={20} />
@@ -375,18 +406,21 @@ export default function CardModal({
                       <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-400/30">
                         <Check size={30} strokeWidth={2.5} />
                       </div>
-                      <h3 className="text-lg font-semibold">Card added</h3>
+                      <h3 className="text-lg font-semibold">{copy.successTitle}</h3>
                       <p className="mt-1 max-w-[280px] text-sm text-white/50">
-                        {brand.label !== 'LUBRIX' ? brand.label : 'Your card'} ending in{' '}
-                        <span className="font-mono text-white/80">{digits.slice(-4)}</span> is ready
-                        to use.
+                        {copy.successText
+                          .replace(
+                            '{brand}',
+                            brand.label !== 'LUBRIX' ? brand.label : copy.yourCard
+                          )
+                          .replace('{digits}', digits.slice(-4))}
                       </p>
                       <button
                         type="button"
                         onClick={() => setOpen(false)}
                         className="mt-7 w-full rounded-xl bg-blue-600 py-3.5 text-sm font-semibold transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                       >
-                        Done
+                        {copy.done}
                       </button>
                     </motion.div>
                   ) : (
@@ -426,14 +460,20 @@ export default function CardModal({
 
                             <div className="relative mt-4 flex items-end justify-between gap-3">
                               <div className="min-w-0">
-                                <div className="mb-0.5 text-[9px] text-white/40">Card holder</div>
+                                <div className="mb-0.5 text-[9px] text-white/40">
+                                  {copy.cardHolderPreview}
+                                </div>
                                 <div className="truncate text-xs tracking-wider">
-                                  {card.holder || 'YOUR NAME'}
+                                  {card.holder || copy.defaultHolder}
                                 </div>
                               </div>
                               <div className="shrink-0 text-right">
-                                <div className="mb-0.5 text-[9px] text-white/40">Expires</div>
-                                <div className="font-mono text-xs">{card.expiry || 'MM/YY'}</div>
+                                <div className="mb-0.5 text-[9px] text-white/40">
+                                  {copy.expiresPreview}
+                                </div>
+                                <div className="font-mono text-xs">
+                                  {card.expiry || copy.defaultExpiry}
+                                </div>
                               </div>
                               <AnimatePresence mode="wait">
                                 <motion.span
@@ -462,11 +502,11 @@ export default function CardModal({
                             <div className="mt-5 flex items-center gap-3 px-5">
                               <div className="h-9 flex-1 rounded-md bg-white/80" />
                               <div className="flex h-9 w-16 items-center justify-center rounded-md bg-white font-mono text-sm font-semibold tracking-widest text-slate-900">
-                                {card.cvv ? '•'.repeat(card.cvv.length) : '•••'}
+                                {card.cvv ? '•'.repeat(card.cvv.length) : copy.defaultCVV}
                               </div>
                             </div>
                             <p className="mt-5 px-5 text-[10px] leading-relaxed text-white/50">
-                              The 3-digit security code is printed on the back of your card.
+                              {copy.summary}
                             </p>
                           </div>
                         </motion.div>
@@ -475,7 +515,7 @@ export default function CardModal({
                       {/* Form */}
                       <form onSubmit={handleSubmit} noValidate className="relative">
                         <div className="space-y-1">
-                          <Field id={ids.number} label="Card number" error={visibleError('number')}>
+                          <Field id={ids.number} label={copy.number} error={visibleError('number')}>
                             <input
                               ref={firstInputRef}
                               id={ids.number}
@@ -485,14 +525,18 @@ export default function CardModal({
                               onBlur={() => blur('number')}
                               inputMode="numeric"
                               autoComplete="cc-number"
-                              placeholder="0000 0000 0000 0000"
+                              placeholder={copy.numberPlaceholder}
                               aria-invalid={!!visibleError('number')}
                               aria-describedby={`${ids.number}-msg`}
                               className={`${inputClass(visibleError('number'))} font-mono tracking-wider`}
                             />
                           </Field>
 
-                          <Field id={ids.holder} label="Card holder" error={visibleError('holder')}>
+                          <Field
+                            id={ids.holder}
+                            label={copy.cardHolder}
+                            error={visibleError('holder')}
+                          >
                             <input
                               id={ids.holder}
                               value={card.holder}
@@ -500,7 +544,7 @@ export default function CardModal({
                               onFocus={() => setFocused('holder')}
                               onBlur={() => blur('holder')}
                               autoComplete="cc-name"
-                              placeholder="NAME AS ON CARD"
+                              placeholder={copy.holderPlaceholder}
                               aria-invalid={!!visibleError('holder')}
                               aria-describedby={`${ids.holder}-msg`}
                               className={`${inputClass(visibleError('holder'))} tracking-wider`}
@@ -510,7 +554,7 @@ export default function CardModal({
                           <div className="grid grid-cols-2 gap-4">
                             <Field
                               id={ids.expiry}
-                              label="Expiry date"
+                              label={copy.expiry}
                               error={visibleError('expiry')}
                             >
                               <input
@@ -528,7 +572,7 @@ export default function CardModal({
                               />
                             </Field>
 
-                            <Field id={ids.cvv} label="CVV" error={visibleError('cvv')}>
+                            <Field id={ids.cvv} label={copy.cvv} error={visibleError('cvv')}>
                               <div className="relative">
                                 <input
                                   id={ids.cvv}
@@ -547,7 +591,7 @@ export default function CardModal({
                                 <button
                                   type="button"
                                   onClick={() => setShowCvv((s) => !s)}
-                                  aria-label={showCvv ? 'Hide CVV' : 'Show CVV'}
+                                  aria-label={showCvv ? copy.hideCvv : copy.showCvv}
                                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-white/40 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
                                 >
                                   {showCvv ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -575,18 +619,18 @@ export default function CardModal({
                           {status === 'loading' ? (
                             <>
                               <Loader2 size={17} className="animate-spin" />
-                              Processing…
+                              {copy.processing}
                             </>
                           ) : (
                             <>
                               <Lock size={16} />
-                              {amount ? `Pay ${amount}` : 'Pay securely'}
+                              {amount ? copy.payAmount.replace('{amount}', amount) : copy.paySecure}
                             </>
                           )}
                         </button>
 
                         <p className="mt-4 text-center text-[11px] leading-relaxed text-white/50">
-                          Your card details are encrypted and never stored on our servers.
+                          {copy.encryptedInfo}
                         </p>
                       </form>
                     </>

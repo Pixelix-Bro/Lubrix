@@ -1,250 +1,371 @@
-import { Icon } from '@iconify/react'
-import { gsap } from 'gsap'
-import { ArrowLeft, Check, ShieldCheck } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import CardModal from '../components/mini/Cardinput'
-import { monthlyPlans } from '../data/root'
+import { ArrowLeft, CheckCircle2, CreditCard, Lock, ShieldCheck, User, Sparkles } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import CardModal from '../components/mini/Cardinput';
+import {
+  UzcardIcon,
+  HumoIcon,
+  ClickIcon,
+  PaymeIcon,
+  UzumIcon,
+  VisaIcon,
+  MastercardIcon,
+} from '../components/payment/CardIcons';
+import { monthlyPlans, yearlyPlans } from '../data/root';
+import { translations } from '../i18n/translations';
+import { loginSuccess } from '../Redux/auth';
+import { lubrixApi } from '../services/api';
 
 const METHODS = [
-  { id: 1, name: 'Visa', icon: 'logos:visa' },
-  { id: 2, name: 'Mastercard', icon: 'logos:mastercard' },
-  { id: 3, name: 'Uzcard', image: '/checkout/uzcard.svg' },
-  { id: 4, name: 'Humo', image: '/checkout/humo.png' },
-]
-
-// sessionStorage can throw (private mode, blocked storage) — never crash the page for it
-const readSession = (key) => {
-  try {
-    return sessionStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
+  { id: 1, name: 'Uzcard / Humo', provider: 'UZCARD', type: 'CARD', badge: 'Plastik Karta', Icon: UzcardIcon },
+  { id: 2, name: 'Click Up', provider: 'CLICK', type: 'ONLINE', badge: '0% Komissiya', Icon: ClickIcon },
+  { id: 3, name: 'Payme Business', provider: 'PAYME', type: 'ONLINE', badge: 'Tezkor To‘lov', Icon: PaymeIcon },
+  { id: 4, name: 'Uzum Bank', provider: 'UZUM', type: 'ONLINE', badge: 'Bank To‘lovi', Icon: UzumIcon },
+];
 
 export default function Checkout() {
-  const navigate = useNavigate()
-  const rootRef = useRef(null)
-  const [selectedMethod, setSelectedMethod] = useState(null)
-  const [paying, setPaying] = useState(false)
+  const locale = useSelector((state) => state.language.language);
+  const theme = useSelector((state) => state.themes.theme);
+  const dict = translations[locale] || translations.uz;
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
-  // FIX: getItem returns a string, not an array — it can't be destructured.
-  const planId = readSession('lubrix-plan')
-  const billing = readSession('lubrix-billing') || 'monthly'
+  const [selectedMethod, setSelectedMethod] = useState(1);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [orderComplete, setOrderComplete] = useState(false);
+  const [accountInfo, setAccountInfo] = useState(null);
 
-  // Assumes monthlyPlans is an array of { id, name | title, price, features? }.
-  // Adjust the field names below if your data differs.
-  const plan = useMemo(
-    () => (monthlyPlans ?? []).find((p) => String(p.id) === String(planId)),
-    [planId]
-  )
-  const planName = plan?.name ?? plan?.title
-  const price = plan?.price
-
-  useLayoutEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const ctx = gsap.context(() => {
-      gsap.from('.text-one', {
-        y: 60,
-        opacity: 0,
-        duration: 0.9,
-        stagger: 0.12,
-        ease: 'power2.out',
-      })
-      gsap.from('.panel-in', {
-        y: 24,
-        opacity: 0,
-        duration: 0.7,
-        stagger: 0.12,
-        delay: 0.35,
-        ease: 'power2.out',
-      })
-    }, rootRef)
-    return () => ctx.revert()
-  }, [])
-  const images = ['/checkout/humo.png', '/checkout/uzcard.svg']
+  // Read registered intent if user came from register page
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    organizationName: '',
+    phone: '+998',
+    password: '',
+  });
 
   useEffect(() => {
-    images.forEach((src) => {
-      const img = new Image()
-      img.src = src
-    })
-  }, [])
+    try {
+      const savedIntent = sessionStorage.getItem('lubrix_register_intent');
+      if (savedIntent) {
+        const parsed = JSON.parse(savedIntent);
+        setFormData((prev) => ({
+          ...prev,
+          name: parsed.name || '',
+          email: parsed.email || '',
+          organizationName: parsed.organizationName || '',
+          phone: parsed.phone || '+998',
+          password: parsed.password || '',
+        }));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const selectedPlanId = Number(sessionStorage.getItem('lubrix-plan') || sessionStorage.getItem('plans_id')) || 2;
+  const billingCycle = sessionStorage.getItem('lubrix-billing') || sessionStorage.getItem('plans_name') || 'month';
+
+  const plan = useMemo(() => {
+    const list = billingCycle === 'year' ? yearlyPlans : monthlyPlans;
+    return list.find((p) => p.id === selectedPlanId) || list[1];
+  }, [selectedPlanId, billingCycle]);
+
+  const rawPrice = plan ? plan.price : 49;
+  const amountStr = `$${rawPrice}.00`;
+
+  const executePayment = async (cardData = null) => {
+    if (!formData.email || !formData.organizationName) {
+      toast.error('Iltimos, avval elektron pochta va tashkilot nomini kiriting');
+      return;
+    }
+
+    const currentMethod = METHODS.find((m) => m.id === selectedMethod) || METHODS[0];
+
+    if (currentMethod.type === 'CARD' && !cardData) {
+      setModalOpen(true);
+      return;
+    }
+
+    setModalOpen(false);
+    try {
+      setLoading(true);
+      const res = await lubrixApi.checkoutRegister({
+        name: formData.name || 'Servis Egasi',
+        email: formData.email,
+        organizationName: formData.organizationName || 'Mening Servisim',
+        phone: formData.phone,
+        password: formData.password || undefined,
+        planName: plan.name,
+        paymentProvider: currentMethod.provider,
+        cardNumber: cardData?.number || '8600 1234 5678 9999',
+      });
+
+      if (res.data?.success && res.data?.token) {
+        dispatch(
+          loginSuccess({
+            token: res.data.token,
+            user: res.data.user,
+          })
+        );
+        setAccountInfo({
+          email: formData.email,
+          password: res.data.generatedPassword || formData.password,
+          provider: currentMethod.name,
+        });
+        setOrderComplete(true);
+        sessionStorage.removeItem('lubrix_register_intent');
+        toast.success('To‘lov muvaffaqiyatli qabul qilindi va hisobingiz faollashtirildi!');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.message || 'To‘lovda xatolik yuz berdi');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCardSubmitSuccess = (cardData) => {
+    executePayment(cardData);
+  };
 
   return (
-    <div ref={rootRef} className="fixed inset-0 h-dvh w-full bg-black">
-      <video
-        loop
-        autoPlay
-        muted
-        playsInline
-        preload="metadata"
-        aria-hidden="true"
-        className="fixed inset-0 h-full w-full object-cover motion-reduce:hidden"
-      >
-        <source preload="auto" src="/video/checkout.mp4" type="video/mp4" />
-      </video>
+    <div
+      className={`min-h-screen py-8 px-4 sm:px-6 transition-colors duration-200 font-sans ${
+        theme ? 'bg-background text-white' : 'bg-gray-50 text-gray-900'
+      }`}
+    >
+      <div className="max-w-4xl mx-auto">
+        <button
+          onClick={() => navigate('/plans')}
+          className="flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-white transition mb-6"
+        >
+          <ArrowLeft size={16} />
+          <span>Tariflar sahifasiga qaytish</span>
+        </button>
 
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-[1] h-[200px] bg-gradient-to-b from-black to-transparent sm:h-[300px]" />
+        {orderComplete ? (
+          <div
+            className={`p-8 rounded-3xl border text-center space-y-4 max-w-lg mx-auto ${
+              theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white shadow-xl'
+            }`}
+          >
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto">
+              <CheckCircle2 size={36} />
+            </div>
 
-      <button
-        type="button"
-        onClick={() => navigate(-1)}
-        className="group fixed left-3 top-3 z-30 flex items-center gap-3 rounded-lg p-3 font-[title] text-sm tracking-[3px] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 sm:left-5 sm:top-5 sm:gap-5 sm:p-5 sm:text-base sm:tracking-[5px]"
-      >
-        <ArrowLeft
-          size={20}
-          className="shrink-0 -translate-x-2 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100 sm:size-6"
-        />
-        <span className="transition-transform duration-200 group-hover:translate-x-1">BACK</span>
-      </button>
+            <h2 className="text-xl font-bold font-[title]">TO‘LOV MUVAFFAQIYATLI AMALGA OSHIRILDI!</h2>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Sizning Lubrix {plan.name} obunangiz faollashtirildi. Kirish ma'lumotlari sizning elektron pochtangizga yuborildi.
+            </p>
 
-      {/* FIX: the page itself scrolls, so nothing is cut off on phones */}
-      <div className="relative z-10 h-full w-full overflow-y-auto text-white">
-        <main className="mx-auto flex min-h-full w-full max-w-[1200px] flex-col items-center px-4 pb-10 pt-20 sm:px-6 sm:pt-24 lg:justify-center lg:px-10">
-          <h1 className="flex flex-wrap justify-center mt-20 sm:mt-0 gap-x-2 overflow-hidden text-center font-[title] text-[18px] font-thin tracking-[3px] sm:gap-x-3 sm:text-[30px] sm:tracking-[5px] md:text-[36px] lg:text-[40px] absolute top-5">
-            <span className="text-one inline-block">LUBRIX</span>
-            <span className="text-one inline-block">PLANS</span>
-            <span className="text-one inline-block">CHECKOUT</span>
-          </h1>
-
-          {/* FIX: grid-cols-2 was fixed — now stacks on mobile */}
-          <div className="mt-20 sm:mt-8 grid font-[title] w-full grid-cols-1 gap-5 sm:mt-12 lg:grid-cols-[1.2fr_1fr]">
-            {/* Payment methods */}
-            <section
-              aria-labelledby="pay-title"
-              className="panel-in shadow-2xl flex flex-col gap-6 rounded-2xl border border-white/10 bg-white/15 p-5 backdrop-blur-[30px] sm:p-7"
-            >
-              <div>
-                <h2 id="pay-title" className="text-lg font-semibold">
-                  Payment method
-                </h2>
-                <p className="mt-1 text-sm text-white/55">Choose a card type to continue.</p>
+            {accountInfo && (
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-left text-xs font-mono space-y-1">
+                <p>Email: <span className="text-primary font-bold">{accountInfo.email}</span></p>
+                <p>Parol: <span className="text-amber-400 font-bold">{accountInfo.password}</span></p>
+                <p>Usul: <span className="text-emerald-400">{accountInfo.provider}</span></p>
               </div>
+            )}
 
+            <button
+              onClick={() => navigate('/')}
+              className="w-full py-3.5 px-6 rounded-xl bg-primary hover:bg-blue-600 text-white font-semibold text-sm transition shadow-lg shadow-blue-500/25"
+            >
+              Boshqaruv Paneliga Kirish
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left: Account Setup & Payment Info (7 Cols) */}
+            <div className="lg:col-span-7 space-y-5">
               <div
-                role="radiogroup"
-                aria-labelledby="pay-title"
-                className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+                className={`p-6 rounded-3xl border space-y-4 ${
+                  theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white shadow-sm'
+                }`}
               >
-                {METHODS.map((m) => {
-                  const active = selectedMethod === m.name
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      aria-label={m.name}
-                      title={m.name}
-                      onClick={() => setSelectedMethod(m.name)}
-                      className={[
-                        'relative flex h-[72px] items-center justify-center rounded-xl border p-3 backdrop-blur-md transition duration-300',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400',
-                        active
-                          ? 'border-blue-400 bg-white/20 shadow-[0_0_0_1px_rgba(96,165,250,0.6)]'
-                          : 'border-white/40 bg-black/20 hover:scale-[1.03] hover:border-white/70 hover:bg-white/10',
-                      ].join(' ')}
-                    >
-                      {m.icon ? (
-                        <Icon
-                          icon={m.icon}
-                          width={75}
-                          height={38}
-                          className="max-h-full max-w-full"
-                        />
-                      ) : (
-                        <img
-                          src={m.image}
-                          alt=""
-                          loading="lazy"
-                          className="h-full w-full object-contain"
-                        />
-                      )}
-                      {active && (
-                        <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500">
-                          <Check size={12} strokeWidth={3} />
-                        </span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
+                <h2 className="text-base font-bold font-[title] flex items-center gap-2">
+                  <User size={18} className="text-primary" />
+                  <span>1. Tashkilot va Mulkdor Ma'lumotlari</span>
+                </h2>
 
-              <p className="flex items-center gap-2 text-xs text-white/50">
-                <ShieldCheck size={15} className="shrink-0" />
-                Payments are encrypted. Your card details are never stored on our servers.
-              </p>
-            </section>
-
-            {/* Order summary (replaces the "cnjds" placeholder) */}
-            <aside
-              aria-labelledby="summary-title"
-              className="panel-in flex flex-col rounded-2xl border border-white/10 bg-white/15 p-5 backdrop-blur-[30px] sm:p-7"
-            >
-              <h2 id="summary-title" className="text-lg font-semibold">
-                Order summary
-              </h2>
-
-              {plan ? (
-                <>
-                  <dl className="mt-5 space-y-3 text-sm">
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-white/55">Plan</dt>
-                      <dd className="font-medium">{planName}</dd>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-white/55">Billing</dt>
-                      <dd className="font-medium capitalize">{billing}</dd>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-white/55">Payment method</dt>
-                      <dd className="font-medium">{selectedMethod ?? 'Not selected'}</dd>
-                    </div>
-                  </dl>
-
-                  <div className="mt-5 flex items-baseline justify-between border-t border-white/15 pt-5">
-                    <span className="text-white/70">Total</span>
-                    <span className="text-2xl font-semibold">{price}$</span>
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-gray-400 mb-1 font-semibold uppercase">
+                      Servis yoki Kompaniya Nomi *
+                    </label>
+                    <input
+                      value={formData.organizationName}
+                      onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
+                      placeholder="Lubrix Avto Servis"
+                      required
+                      className={`w-full px-3.5 py-2.5 rounded-xl border outline-none ${
+                        theme ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'
+                      }`}
+                    />
                   </div>
 
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-gray-400 mb-1 font-semibold uppercase">
+                        Mulkdor Ismi *
+                      </label>
+                      <input
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Alisher Zokirov"
+                        required
+                        className={`w-full px-3.5 py-2.5 rounded-xl border outline-none ${
+                          theme ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-400 mb-1 font-semibold uppercase">
+                        Telefon Raqami
+                      </label>
+                      <input
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        placeholder="+998901234567"
+                        className={`w-full px-3.5 py-2.5 rounded-xl border outline-none font-mono ${
+                          theme ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-400 mb-1 font-semibold uppercase">
+                      Elektron Pochta (Parol shu yerga yuboriladi) *
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="info@avtoservis.uz"
+                      required
+                      className={`w-full px-3.5 py-2.5 rounded-xl border outline-none ${
+                        theme ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Methods */}
+              <div
+                className={`p-6 rounded-3xl border space-y-4 ${
+                  theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white shadow-sm'
+                }`}
+              >
+                <h2 className="text-base font-bold font-[title] flex items-center gap-2">
+                  <CreditCard size={18} className="text-emerald-400" />
+                  <span>2. To‘lov Usulini Tanlang</span>
+                </h2>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {METHODS.map((m) => {
+                    const MethodIcon = m.Icon;
+                    const isSelected = selectedMethod === m.id;
+                    return (
+                      <div
+                        key={m.id}
+                        onClick={() => setSelectedMethod(m.id)}
+                        className={`p-3 rounded-2xl border cursor-pointer flex flex-col items-center justify-center gap-2 transition text-center ${
+                          isSelected
+                            ? 'border-primary bg-primary/10 shadow-lg scale-[1.02]'
+                            : 'border-inherit hover:border-gray-500'
+                        }`}
+                      >
+                        <div className="h-8 flex items-center justify-center">
+                          <MethodIcon className="h-7 w-auto" />
+                        </div>
+                        <span className="text-xs font-bold leading-tight">{m.name}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-gray-400">{m.badge}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Additional Supported Card Brands SVG */}
+                <div className="pt-2 flex items-center justify-center gap-3 opacity-70">
+                  <span className="text-[11px] text-gray-400">Qo‘llab-quvvatlanadi:</span>
+                  <VisaIcon className="h-4 w-auto" />
+                  <MastercardIcon className="h-4 w-auto" />
+                  <HumoIcon className="h-4 w-auto" />
+                  <UzcardIcon className="h-4 w-auto" />
+                </div>
+
+                <div className="pt-2">
                   <button
                     type="button"
-                    disabled={!selectedMethod}
-                    onClick={() => setPaying(true)}
-                    className="mt-6 w-full rounded-xl bg-blue-600 py-4 text-sm font-semibold transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={loading}
+                    onClick={() => executePayment()}
+                    className="w-full flex items-center justify-center gap-2 py-4 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm tracking-wide transition shadow-xl shadow-emerald-600/25 cursor-pointer disabled:opacity-50"
                   >
-                    {selectedMethod ? `Enter ${selectedMethod} details` : 'Choose a payment method'}
-                  </button>
-                </>
-              ) : (
-                <div className="mt-5 flex flex-1 flex-col items-start gap-4">
-                  <p className="text-sm text-white/60">
-                    No plan selected. Go back and choose a plan to continue.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => navigate(-1)}
-                    className="rounded-xl bg-white/15 px-5 py-3 text-sm font-medium transition hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                  >
-                    Choose a plan
+                    <Lock size={16} />
+                    <span>
+                      {loading ? 'To‘lov amalga oshirilmoqda...' : `XAVFSIZ TO‘LOVNI BOSHLASH (${amountStr})`}
+                    </span>
                   </button>
                 </div>
-              )}
-            </aside>
-          </div>
-        </main>
-      </div>
+              </div>
+            </div>
 
-      {/* Modal renders through a portal, so it can live outside the layout */}
-      {paying && selectedMethod && plan && (
+            {/* Right: Order Summary (5 Cols) */}
+            <div className="lg:col-span-5">
+              <div
+                className={`p-6 rounded-3xl border space-y-4 sticky top-10 ${
+                  theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white shadow-sm'
+                }`}
+              >
+                <h3 className="text-sm font-bold font-[title] border-b border-inherit pb-3 text-primary">
+                  Buyurtma Xulosasi
+                </h3>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-400">Tanlangan Tarif:</span>
+                  <span className="font-bold font-[title] text-sm text-primary">{plan.name}</span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-400">To‘lov Davri:</span>
+                  <span className="font-medium">{billingCycle === 'year' ? '1 Yillik (-20%)' : 'Oylik'}</span>
+                </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-inherit text-[11px] text-gray-400">
+                  <p>✓ Cheksiz mijozlar va avtomobillar bazasi</p>
+                  <p>✓ SMS eslatmalar va Telegram bot</p>
+                  <p>✓ 100% Multi-tenant xavfsizlik kafolati</p>
+                  <p>✓ 256-bit SSL shifrlangan to‘lov</p>
+                </div>
+
+                <div className="pt-4 border-t border-inherit flex items-center justify-between font-bold">
+                  <span className="text-xs uppercase tracking-wider font-[title]">Jami To‘lov:</span>
+                  <span className="text-2xl font-mono text-emerald-400">{amountStr}</span>
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] text-gray-400 pt-2">
+                  <ShieldCheck size={16} className="text-emerald-400 shrink-0" />
+                  <span>To‘lov tasdiqlangach, hisobingiz darhol faollashtiriladi.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Card Input Modal */}
         <CardModal
-          key={selectedMethod}
-          method={selectedMethod}
-          amount={String(price)}
-          onClose={() => setPaying(false)}
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          method={METHODS.find((m) => m.id === selectedMethod)?.name || 'Uzcard'}
+          amount={amountStr}
+          onSubmit={handleCardSubmitSuccess}
         />
-      )}
+      </div>
     </div>
-  )
+  );
 }

@@ -1,23 +1,15 @@
 @import 'tailwindcss';
 
 @font-face {
-  font-family: 'title';
+  font-family: 'brand';
   src: url('./fonts/Orbitron/Orbitron-VariableFont_wght.ttf') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'dic';
-  src: url('./fonts/Orbitron/static/Orbitron-Medium.ttf') format('woff2');
-  font-weight: 400;
+  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 
 @theme {
-  --color-background: #080c14;
+  --color-background: #090d16;
   --color-surface: #0f172a;
   --color-surface-hover: #1e293b;
   --color-primary: #2563eb;
@@ -25,24 +17,44 @@
   --color-accent-light: #60a5fa;
   --color-text-primary: #f8fafc;
   --color-text-muted: #94a3b8;
-  --color-border: #1e3a5f;
+  --color-border: #1e293b;
 }
 
-.grandes {
-  background: linear-gradient(transparent, white);
+body {
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-#input::placeholder {
-  font-family: title;
-  word-spacing: 5px;
-  letter-spacing: 2px;
+.font-title, [class*="font-[title]"] {
+  font-family: "Outfit", "Plus Jakarta Sans", sans-serif;
 }
 
-.text-sss {
-  font-size: clamp(0.8rem, 1vw, 0.8rem);
+.font-brand {
+  font-family: 'brand', sans-serif;
+  letter-spacing: 0.05em;
 }
 
+/* Professional clean scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 
-button{
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+button {
   cursor: pointer;
 }
