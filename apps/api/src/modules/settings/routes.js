@@ -14,6 +14,7 @@ router.put('/profile', requireAuth, SettingsController.updateProfile);
 // Payment Cards (STRICT: Only OWNER)
 router.get('/cards', requireAuth, SettingsController.getPaymentCards);
 router.post('/cards', requireAuth, requireRole('OWNER'), SettingsController.addPaymentCard);
+router.put('/cards/:id', requireAuth, requireRole('OWNER'), SettingsController.updatePaymentCard);
 router.delete('/cards/:id', requireAuth, requireRole('OWNER'), SettingsController.deletePaymentCard);
 
 // Service Lane Camera ANPR Settings
@@ -23,6 +24,7 @@ router.post('/camera', requireAuth, requireRole('OWNER', 'ADMIN'), SettingsContr
 // Categories
 router.get('/categories', requireAuth, SettingsController.getCategories);
 router.post('/categories', requireAuth, requireRole('OWNER', 'ADMIN'), SettingsController.createCategory);
+router.put('/categories/:id', requireAuth, requireRole('OWNER', 'ADMIN'), SettingsController.updateCategory);
 router.delete('/categories/:id', requireAuth, requireRole('OWNER', 'ADMIN'), SettingsController.deleteCategory);
 
 // Audit Logs

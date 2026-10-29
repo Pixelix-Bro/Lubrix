@@ -10,8 +10,10 @@ router.post('/verify', requireAuth, requireRole('OWNER', 'ADMIN'), TelegramContr
 router.post('/save', requireAuth, requireRole('OWNER', 'ADMIN'), TelegramController.saveIntegration);
 router.post('/disconnect', requireAuth, requireRole('OWNER', 'ADMIN'), TelegramController.disconnect);
 router.post('/test', requireAuth, requireRole('OWNER', 'ADMIN'), TelegramController.sendTestMessage);
+router.get('/commands', requireAuth, TelegramController.listCommands);
+router.post('/commands', requireAuth, requireRole('OWNER', 'ADMIN'), TelegramController.saveCommand);
+router.delete('/commands/:id', requireAuth, requireRole('OWNER', 'ADMIN'), TelegramController.deleteCommand);
 
-// Public Webhook receiver (called by Telegram servers)
 router.post('/webhook/:orgId', TelegramController.handleWebhook);
 
 export default router;

@@ -1,5 +1,6 @@
 import crypto from 'crypto'
-import { TelegramIntegration } from '../../models/index.js'
+import { TelegramCommand, TelegramIntegration } from '../../models/index.js'
+import { activateTelegramBot, stopTelegramPolling } from './runtime.js'
 import { TelegramService } from './telegramService.js'
 
 export const TelegramController = {
@@ -103,9 +104,12 @@ export const TelegramController = {
         { upsert: true, new: true }
       )
 
+      await TelegramService.ensureDefaultCommands(req.organizationId)
+      await activateTelegramBot(integration)
+
       res.json({
         success: true,
-        message: 'Telegram bot muvaffaqiyatli ulandi va faollashtirildi!',
+        message: 'Telegram bot muvaffaqiyatli ulandi va serverda ishga tushirildi',
         data: {
           botUsername: integration.botUsername,
           botName: integration.botName,
@@ -120,6 +124,7 @@ export const TelegramController = {
   // 4. Disconnect Bot
   async disconnect(req, res, next) {
     try {
+      stopTelegramPolling(req.organizationId)
       await TelegramIntegration.findOneAndUpdate(
         { organizationId: req.organizationId },
         { isActive: false }
@@ -165,7 +170,78 @@ export const TelegramController = {
       res.json({ ok: true })
     } catch (err) {
       console.error('Webhook error:', err)
-      res.json({ ok: true }) // Acknowledge to Telegram anyway
+      res.json({ ok: true })
+    }
+  },
+
+  async listCommands(req, res, next) {
+    try {
+      await TelegramService.ensureDefaultCommands(req.organizationId)
+      const commands = await TelegramCommand.find({ organizationId: req.organizationId }).sort({
+        createdAt: 1,
+      })
+      res.json({ success: true, data: commands })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  async saveCommand(req, res, next) {
+    try {
+      const { id, command, title, description, responseTemplate, isActive = true } = req.body
+      const cmd = String(command || '')
+        .trim()
+        .replace(/^\/*/, '/')
+        .toLowerCase()
+      if (!cmd || cmd.length < 2 || !title || !responseTemplate) {
+        return res.status(400).json({
+          success: false,
+          error: 'Buyruq, nomi va javob matni kiritilishi shart',
+        })
+      }
+
+      let doc
+      if (id) {
+        doc = await TelegramCommand.findOneAndUpdate(
+          { _id: id, organizationId: req.organizationId },
+          { $set: { command: cmd, title, description: description || '', responseTemplate, isActive } },
+          { new: true }
+        )
+      } else {
+        doc = await TelegramCommand.create({
+          organizationId: req.organizationId,
+          command: cmd,
+          title,
+          description: description || '',
+          responseTemplate,
+          isActive,
+          isSystem: false,
+        })
+      }
+      res.json({ success: true, data: doc })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  async deleteCommand(req, res, next) {
+    try {
+      const existing = await TelegramCommand.findOne({
+        _id: req.params.id,
+        organizationId: req.organizationId,
+      })
+      if (!existing) {
+        return res.status(404).json({ success: false, error: 'Buyruq topilmadi' })
+      }
+      if (existing.isSystem) {
+        return res
+          .status(400)
+          .json({ success: false, error: 'Tizim buyrug‘ini o‘chirib bo‘lmaydi, tahrirlang' })
+      }
+      await existing.deleteOne()
+      res.json({ success: true })
+    } catch (err) {
+      next(err)
     }
   },
 }

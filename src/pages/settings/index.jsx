@@ -12,8 +12,6 @@ import BillingTab from './tabs/BillingTab';
 import IntegrationsTab from './tabs/IntegrationsTab';
 import CameraTab from './tabs/CameraTab';
 import InventoryTab from './tabs/InventoryTab';
-import DataPrivacyTab from './tabs/DataPrivacyTab';
-import HelpTab from './tabs/HelpTab';
 
 export default function Settings() {
   const theme = useSelector((state) => state.themes.theme);
@@ -27,18 +25,18 @@ export default function Settings() {
 
   // 1. General Organization Data
   const [orgData, setOrgData] = useState({
-    name: 'Lubrix Avto Servis',
+    name: '',
     countryCode: 'UZ',
     timezone: 'Asia/Tashkent',
     currency: 'UZS',
     defaultLocale: 'uz',
-    phone: '+998712001122',
-    email: 'info@lubrix.uz',
-    address: 'Toshkent sh., Yunusobod tumani',
+    phone: '',
+    email: '',
+    address: '',
     settings: {
       lowStockThreshold: 10,
-      workingDays: 'Dushanba - Shanba',
-      smsSender: '4546',
+      workingDays: '',
+      smsSender: '',
       smsProvider: 'eskiz',
       autoReminders: true,
     },
@@ -57,8 +55,8 @@ export default function Settings() {
 
   // 3. Camera / ANPR
   const [cameraSettings, setCameraSettings] = useState({
-    cameraName: '1-Yo‘lak Kirish Kamerasi (ANPR)',
-    streamUrl: 'rtsp://192.168.1.100:554/ch0',
+    cameraName: '',
+    streamUrl: '',
     autoANPR: true,
     actionOnDetect: 'OPEN_SERVICE',
     minConfidence: 85,
@@ -70,7 +68,7 @@ export default function Settings() {
     botUsername: '',
     isActive: false,
     ownerTelegramChatId: '',
-    welcomeMessage: 'Assalomu alaykum! Lubrix xizmat botiga xush kelibsiz.',
+    welcomeMessage: '',
     notifications: {
       newBooking: true,
       serviceCompleted: true,
@@ -84,19 +82,17 @@ export default function Settings() {
   // 5. Categories, Audit, Billing
   const [categories, setCategories] = useState([]);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [auditLogs, setAuditLogs] = useState([]);
   const [billingTransactions, setBillingTransactions] = useState([]);
   const [billingInvoices, setBillingInvoices] = useState([]);
 
   const loadAllSettings = useCallback(async () => {
     try {
-      const [settingsRes, cardsRes, camRes, tgRes, catRes, logsRes, txRes, invRes] = await Promise.all([
+      const [settingsRes, cardsRes, camRes, tgRes, catRes, txRes, invRes] = await Promise.all([
         lubrixApi.getSettings().catch(() => ({ data: {} })),
         lubrixApi.getPaymentCards().catch(() => ({ data: { data: [] } })),
         lubrixApi.getCameraSettings().catch(() => ({ data: { data: [] } })),
         lubrixApi.getTelegramStatus().catch(() => ({ data: { data: {} } })),
         lubrixApi.getCategories().catch(() => ({ data: { data: [] } })),
-        lubrixApi.getAuditLogs().catch(() => ({ data: { data: [] } })),
         lubrixApi.getTransactions().catch(() => ({ data: { data: [] } })),
         lubrixApi.getInvoices().catch(() => ({ data: { data: [] } })),
       ]);
@@ -112,7 +108,6 @@ export default function Settings() {
         setTelegramData((prev) => ({ ...prev, ...(tgRes.data.data || {}) }));
       }
       setCategories(catRes.data?.data || []);
-      setAuditLogs(logsRes.data?.data || []);
       setBillingTransactions(txRes.data?.data || []);
       setBillingInvoices(invRes.data?.data || []);
     } catch (err) {
@@ -271,7 +266,7 @@ export default function Settings() {
             <span>Tizim Sozlamalari</span>
           </h1>
           <p className="text-xs sm:text-sm text-gray-400 mt-1">
-            Kompaniya profili, integratsiyalar, to‘lovlar va xavfsizlik audit parametrlari
+            Kompaniya profili, integratsiyalar, to‘lovlar va ombor parametrlari
           </p>
         </div>
       </div>
@@ -351,9 +346,6 @@ export default function Settings() {
             />
           )}
 
-          {activeTab === 'dataPrivacy' && <DataPrivacyTab auditLogs={auditLogs} />}
-
-          {activeTab === 'help' && <HelpTab />}
         </div>
       </div>
     </div>

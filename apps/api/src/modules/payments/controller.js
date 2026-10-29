@@ -31,7 +31,7 @@ export const PaymentsController = {
         organizationId: req.organizationId,
         serviceId: serviceId || null,
         customerId: customerId || null,
-        customerName: customerName || 'Mijoz',
+        customerName: customerName || 'Bir martalik mijoz',
         amount: Number(amount),
         currency: 'UZS',
         provider: provider.toUpperCase(),
@@ -93,25 +93,59 @@ export const PaymentsController = {
 
       const receiptNumber = `RCP-${Date.now().toString().slice(-6)}`
       const merchantTransId = `POS-${Date.now()}`
+      const method = String(provider || 'CASH').toUpperCase()
+      const isCash = method === 'CASH'
+      const paymentStatus = isCash ? 'PAID' : 'PENDING'
 
-      // 1. Create Transaction
+      let paymentUrl = ''
+      if (method === 'CLICK') {
+        const clickServiceId = process.env.CLICK_SERVICE_ID || ''
+        const merchantId = process.env.CLICK_MERCHANT_ID || ''
+        paymentUrl = clickServiceId
+          ? `https://my.click.uz/services/pay?service_id=${clickServiceId}&merchant_id=${merchantId}&amount=${amount}&transaction_param=${merchantTransId}`
+          : ''
+      } else if (method === 'PAYME') {
+        const merchantId = process.env.PAYME_MERCHANT_ID || ''
+        if (merchantId) {
+          const base64Params = Buffer.from(
+            `m=${merchantId};ac.order_id=${merchantTransId};a=${Number(amount) * 100}`
+          ).toString('base64')
+          paymentUrl = `https://checkout.paycom.uz/${base64Params}`
+        }
+      }
+
       const transaction = await Transaction.create({
         organizationId: req.organizationId,
         amount: Number(amount),
         currency: 'UZS',
-        provider: provider.toUpperCase(),
-        paymentStatus: 'PAID',
-        paidAt: new Date(),
+        provider: method,
+        paymentStatus,
+        paidAt: isCash ? new Date() : null,
         merchantTransactionId: merchantTransId,
         receiptNumber,
         customerId: customerId || null,
-        customerName: customerName || 'Mijoz',
+        customerName: customerName || 'Bir martalik mijoz',
         payerPhone: customerPhone || '',
         payerCardMasked: cardLastFour ? `**** **** **** ${cardLastFour}` : null,
         items,
-        notes: notes || 'Tezkor POS to‘lovi amalga oshirildi',
+        notes: notes || (isCash ? 'Naqd POS to‘lovi' : 'Karta/QR to‘lovi kutilmoqda'),
         createdByUserId: req.userId,
       })
+
+      if (!isCash) {
+        return res.status(201).json({
+          success: true,
+          pending: true,
+          message: 'To‘lov kutilmoqda. Karta yoki QR orqali tasdiqlang.',
+          data: {
+            transaction,
+            receiptNumber,
+            paymentUrl,
+            qrPayload: paymentUrl || `lubrix://pay/${transaction._id}?amount=${amount}`,
+            requiresConfirmation: true,
+          },
+        })
+      }
 
       // 2. Create Official Invoice
       const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`
@@ -119,7 +153,7 @@ export const PaymentsController = {
         organizationId: req.organizationId,
         invoiceNumber,
         customerId: customerId || null,
-        customerName: customerName || 'Mijoz',
+        customerName: customerName || 'Bir martalik mijoz',
         customerPhone: customerPhone || '',
         vehiclePlate: vehiclePlate || '',
         items: items.map((it) => ({
@@ -145,13 +179,13 @@ export const PaymentsController = {
           customerId: customerId || 'walk-in',
           vehicleId: vehiclePlate,
           plate: vehiclePlate,
-          customerName: customerName || 'Mijoz',
+          customerName: customerName || 'Bir martalik mijoz',
           serviceDate: new Date(),
-          odometerKm: serviceDetails?.odometerKm || 50000,
-          oilBrand: serviceDetails?.oilBrand || 'Sintetik Moy',
-          oilType: serviceDetails?.oilType || 'Synthetic',
-          viscosity: serviceDetails?.viscosity || serviceDetails?.oilGrade || '5W-30',
-          oilQuantity: serviceDetails?.liters || 4,
+          odometerKm: Number(serviceDetails?.odometerKm) || 0,
+          oilBrand: serviceDetails?.oilBrand || '—',
+          oilType: serviceDetails?.oilType || '—',
+          viscosity: serviceDetails?.viscosity || serviceDetails?.oilGrade || '—',
+          oilQuantity: serviceDetails?.liters || 0,
           price: Number(amount),
           paymentMethod: provider.toUpperCase(),
           status: 'Tugallandi',
@@ -169,20 +203,23 @@ export const PaymentsController = {
             organizationId: req.organizationId,
             productId: item.productId,
           })
-          if (inv && inv.currentQuantity >= item.quantity) {
-            const before = inv.currentQuantity
-            inv.currentQuantity -= item.quantity
+          const qty = Number(inv.quantity ?? inv.currentQuantity ?? 0)
+          if (inv && qty >= item.quantity) {
+            const before = qty
+            const after = qty - item.quantity
+            inv.quantity = after
             await inv.save()
 
             await StockMovement.create({
               organizationId: req.organizationId,
+              branchId: inv.branchId,
               productId: item.productId,
-              movementType: 'OUT',
-              quantityChange: -item.quantity,
+              type: 'STOCK_OUT',
+              quantityChanged: -item.quantity,
               quantityBefore: before,
-              quantityAfter: inv.currentQuantity,
-              reason: `POS Savdo Cheki #${receiptNumber}`,
-              performedByUserId: req.userId,
+              quantityAfter: after,
+              reason: `POS chek #${receiptNumber}`,
+              userName: req.user?.name || 'Kassir',
             })
           }
         }
@@ -207,6 +244,106 @@ export const PaymentsController = {
           receiptNumber,
         },
       })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  async confirmPosPayment(req, res, next) {
+    try {
+      const { transactionId, cardLastFour } = req.body
+      const trans = await Transaction.findOne({
+        _id: transactionId,
+        organizationId: req.organizationId,
+      })
+      if (!trans) {
+        return res.status(404).json({ success: false, error: 'Tranzaksiya topilmadi' })
+      }
+      if (trans.paymentStatus === 'PAID') {
+        return res.json({ success: true, data: trans })
+      }
+
+      trans.paymentStatus = 'PAID'
+      trans.paidAt = new Date()
+      if (cardLastFour) trans.payerCardMasked = `**** **** **** ${cardLastFour}`
+      trans.notes = 'Karta/QR to‘lovi tasdiqlandi'
+      await trans.save()
+
+      for (const item of trans.items || []) {
+        if (!item.productId) continue
+        const inv = await Inventory.findOne({
+          organizationId: req.organizationId,
+          productId: item.productId,
+        })
+        const qty = Number(inv?.quantity ?? 0)
+        if (inv && qty >= (item.quantity || 0)) {
+          const before = qty
+          const after = qty - item.quantity
+          inv.quantity = after
+          await inv.save()
+          await StockMovement.create({
+            organizationId: req.organizationId,
+            branchId: inv.branchId,
+            productId: item.productId,
+            type: 'STOCK_OUT',
+            quantityChanged: -item.quantity,
+            quantityBefore: before,
+            quantityAfter: after,
+            reason: `POS chek #${trans.receiptNumber}`,
+            userName: req.user?.name || 'Kassir',
+          })
+        }
+      }
+
+      const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`
+      const invoice = await Invoice.create({
+        organizationId: req.organizationId,
+        invoiceNumber,
+        customerId: trans.customerId || null,
+        customerName: trans.customerName || 'Bir martalik mijoz',
+        customerPhone: trans.payerPhone || '',
+        items: (trans.items || []).map((it) => ({
+          description: it.name || 'Xizmat',
+          quantity: it.quantity || 1,
+          unitPrice: it.unitPrice || trans.amount,
+          total: it.total || trans.amount,
+        })),
+        subtotal: Number(trans.amount),
+        totalAmount: Number(trans.amount),
+        status: 'PAID',
+        paymentMethod: trans.provider,
+        paidAt: new Date(),
+        issuedBy: req.user?.name || 'Kassir',
+      })
+
+      emitTenantEvent(req.organizationId, 'PAYMENT_RECEIVED', {
+        transactionId: trans._id,
+        receiptNumber: trans.receiptNumber,
+        amount: trans.amount,
+        customerName: trans.customerName,
+        provider: trans.provider,
+      })
+
+      res.json({
+        success: true,
+        message: 'To‘lov tasdiqlandi',
+        data: { transaction: trans, invoice, receiptNumber: trans.receiptNumber },
+      })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  async getTransaction(req, res, next) {
+    try {
+      const trans = await Transaction.findOne({
+        _id: req.params.id,
+        organizationId: req.organizationId,
+      })
+      if (!trans) {
+        return res.status(404).json({ success: false, error: 'Tranzaksiya topilmadi' })
+      }
+      res.json({ success: true, data: trans })
     } catch (err) {
       next(err)
     }

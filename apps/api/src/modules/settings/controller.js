@@ -186,6 +186,37 @@ export const SettingsController = {
     }
   },
 
+  async updatePaymentCard(req, res, next) {
+    try {
+      if (req.role !== 'OWNER') {
+        return res.status(403).json({
+          success: false,
+          error: 'Faqatgina tashkilot mulkdori kartani tahrirlashi mumkin',
+        })
+      }
+      const { cardHolder, cardType, expiry, bankName, terminalId, isDefault } = req.body
+      const updates = {}
+      if (cardHolder) updates.cardHolder = cardHolder.toUpperCase()
+      if (cardType) updates.cardType = cardType
+      if (expiry) updates.expiry = expiry
+      if (bankName !== undefined) updates.bankName = bankName
+      if (terminalId !== undefined) updates.terminalId = terminalId
+      if (isDefault) {
+        await PaymentCard.updateMany({ organizationId: req.organizationId }, { isDefault: false })
+        updates.isDefault = true
+      }
+      const card = await PaymentCard.findOneAndUpdate(
+        { _id: req.params.id, organizationId: req.organizationId },
+        { $set: updates },
+        { new: true }
+      )
+      if (!card) return res.status(404).json({ success: false, error: 'Karta topilmadi' })
+      res.json({ success: true, data: card })
+    } catch (err) {
+      next(err)
+    }
+  },
+
   async deletePaymentCard(req, res, next) {
     try {
       if (req.role !== 'OWNER') {
@@ -285,6 +316,23 @@ export const SettingsController = {
         description,
       })
       res.status(201).json({ success: true, data: cat })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  async updateCategory(req, res, next) {
+    try {
+      const { name, description } = req.body
+      if (!name) return res.status(400).json({ success: false, error: 'Kategoriya nomi shart' })
+      const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-')
+      const cat = await ProductCategory.findOneAndUpdate(
+        { _id: req.params.id, organizationId: req.organizationId },
+        { $set: { name, slug, description } },
+        { new: true }
+      )
+      if (!cat) return res.status(404).json({ success: false, error: 'Toifa topilmadi' })
+      res.json({ success: true, data: cat })
     } catch (err) {
       next(err)
     }

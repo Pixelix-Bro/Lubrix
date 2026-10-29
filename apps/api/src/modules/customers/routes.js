@@ -17,6 +17,7 @@ const customerValidation = [
 router.get('/', customerController.getCustomers);
 router.get('/:id', customerController.getCustomerById);
 router.post('/', enforceIdempotency, validate(customerValidation), customerController.createCustomer);
+router.put('/:id', customerController.updateCustomer);
 router.patch('/:id', customerController.updateCustomer);
 router.delete('/:id', customerController.deleteCustomer);
 

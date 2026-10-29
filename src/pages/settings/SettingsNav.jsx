@@ -4,11 +4,8 @@ import {
   Building2,
   Camera,
   CreditCard,
-  HelpCircle,
   Palette,
   Search,
-  Settings as SettingsIcon,
-  ShieldAlert,
   User,
   Warehouse,
 } from 'lucide-react';
@@ -22,8 +19,6 @@ export const SETTINGS_SECTIONS = [
   { id: 'integrations', title: 'Telegram Bot & Xizmatlar', icon: Bot },
   { id: 'camera', title: 'Yo‘lak Kamerasi (ANPR)', icon: Camera },
   { id: 'inventory', title: 'Ombor & Mahsulotlar', icon: Warehouse },
-  { id: 'dataPrivacy', title: 'Xavfsizlik & Audit Jurnali', icon: ShieldAlert },
-  { id: 'help', title: 'Dastur Haqida & Yordam', icon: HelpCircle },
 ];
 
 /**

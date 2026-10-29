@@ -70,9 +70,10 @@ export const Branch = mongoose.model('Branch', BranchSchema);
 export const CustomerSchema = new mongoose.Schema({
   organizationId: { type: String, required: true, index: true },
   fullName: { type: String, required: true },
-  phoneE164: { type: String, required: true, index: true },
+  phoneE164: { type: String, index: true },
   email: { type: String },
   preferredLocale: { type: String, default: 'uz' },
+  customerType: { type: String, enum: ['REGULAR', 'WALK_IN'], default: 'REGULAR' },
   telegramChatId: { type: String },
   smsConsentAt: { type: Date, default: Date.now },
   telegramConsentAt: { type: Date },
@@ -84,11 +85,11 @@ export const Customer = mongoose.model('Customer', CustomerSchema);
 // 5. Vehicle Schema
 export const VehicleSchema = new mongoose.Schema({
   organizationId: { type: String, required: true, index: true },
-  customerId: { type: String, required: true, index: true },
+  customerId: { type: String, index: true },
   plateNumber: { type: String, required: true, uppercase: true, trim: true },
   plateCountry: { type: String, default: 'UZ' },
-  make: { type: String, required: true },
-  model: { type: String, required: true },
+  make: { type: String, default: '' },
+  model: { type: String, default: '' },
   modelYear: { type: Number },
   vin: { type: String },
   currentOdometerKm: { type: Number, default: 0 },
@@ -100,8 +101,8 @@ export const Vehicle = mongoose.model('Vehicle', VehicleSchema);
 export const ServiceRecordSchema = new mongoose.Schema({
   organizationId: { type: String, required: true, index: true },
   branchId: { type: String, required: true },
-  vehicleId: { type: String, required: true },
-  customerId: { type: String, required: true },
+  vehicleId: { type: String },
+  customerId: { type: String },
   customerName: { type: String },
   vehicle: { type: String },
   plate: { type: String },
@@ -285,10 +286,56 @@ export const TelegramIntegrationSchema = new mongoose.Schema({
     dailyReport: { type: Boolean, default: true }
   },
   lastError: { type: String },
-  lastSyncedAt: { type: Date }
+  lastSyncedAt: { type: Date },
+  lastUpdateId: { type: Number, default: 0 }
 }, { timestamps: true });
 
 export const TelegramIntegration = mongoose.model('TelegramIntegration', TelegramIntegrationSchema);
+
+export const TelegramCommandSchema = new mongoose.Schema({
+  organizationId: { type: String, required: true, index: true },
+  command: { type: String, required: true },
+  title: { type: String, required: true },
+  description: { type: String, default: '' },
+  responseTemplate: { type: String, required: true },
+  isActive: { type: Boolean, default: true },
+  isSystem: { type: Boolean, default: false },
+}, { timestamps: true });
+
+export const TelegramCommand = mongoose.model('TelegramCommand', TelegramCommandSchema);
+
+export const SmsCampaignSchema = new mongoose.Schema({
+  organizationId: { type: String, required: true, index: true },
+  name: { type: String, required: true },
+  segment: { type: String, default: 'ALL' },
+  message: { type: String, required: true },
+  status: { type: String, enum: ['DRAFT', 'SCHEDULED', 'SENDING', 'SENT', 'FAILED'], default: 'DRAFT' },
+  scheduledAt: { type: Date },
+  sentCount: { type: Number, default: 0 },
+  failedCount: { type: Number, default: 0 },
+  recipientCount: { type: Number, default: 0 },
+  createdBy: { type: String },
+}, { timestamps: true });
+
+export const SmsCampaign = mongoose.model('SmsCampaign', SmsCampaignSchema);
+
+export const SmsTemplateSchema = new mongoose.Schema({
+  organizationId: { type: String, required: true, index: true },
+  name: { type: String, required: true },
+  body: { type: String, required: true },
+}, { timestamps: true });
+
+export const SmsTemplate = mongoose.model('SmsTemplate', SmsTemplateSchema);
+
+export const InAppNotificationSchema = new mongoose.Schema({
+  organizationId: { type: String, required: true, index: true },
+  type: { type: String, required: true },
+  title: { type: String, required: true },
+  body: { type: String, required: true },
+  readAt: { type: Date },
+}, { timestamps: true });
+
+export const InAppNotification = mongoose.model('InAppNotification', InAppNotificationSchema);
 
 // 17. Booking Schema (Online & Telegram Appointments)
 export const BookingSchema = new mongoose.Schema({

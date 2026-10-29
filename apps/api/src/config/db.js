@@ -23,6 +23,7 @@ const isPortListening = (port, host = '127.0.0.1') => {
 
 export const connectDB = async () => {
   const customURI = process.env.MONGODB_URI
+  console.log('MONGODB_URI:', customURI ? 'topildi' : 'TOPILMADI')
 
   if (!customURI) {
     const isListening = await isPortListening(27017)
@@ -40,15 +41,17 @@ export const connectDB = async () => {
   }
 
   const mongoURI = customURI || 'mongodb://127.0.0.1:27017/lubrix_crm'
+  const options = {
+    serverSelectionTimeoutMS: 10000,
+    ...(customURI ? {} : { directConnection: true }),
+  }
+
   try {
-    const conn = await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 3000,
-      directConnection: true,
-    })
+    const conn = await mongoose.connect(mongoURI, options)
     console.log(`[LUBRIX MONGODB] Connected successfully: ${conn.connection.host}`)
     return true
   } catch (error) {
-    console.warn(`[LUBRIX MONGODB] Connection warning: ${error.message}`)
+    console.error(`[LUBRIX MONGODB] Connection FAILED: ${error.message}`)
     return false
   }
 }

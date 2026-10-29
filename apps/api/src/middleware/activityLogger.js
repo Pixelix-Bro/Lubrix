@@ -43,15 +43,33 @@ export function activityLogger(req, res, next) {
 
         const clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1'
 
-        // Sanitize body details (remove passwords or sensitive tokens)
-        const safeBody = { ...req.body }
-        delete safeBody.password
-        delete safeBody.botToken
-        delete safeBody.cardNumber
+        const SENSITIVE = [
+          'password',
+          'botToken',
+          'cardNumber',
+          'avatarUrl',
+          'logoUrl',
+          'token',
+          'cvv',
+          'currentPassword',
+          'newPassword',
+        ]
+        const safeBody = {}
+        for (const [key, val] of Object.entries(req.body || {})) {
+          if (SENSITIVE.includes(key)) {
+            safeBody[key] = '[yashirilgan]'
+            continue
+          }
+          if (typeof val === 'string' && (val.startsWith('data:') || val.length > 180)) {
+            safeBody[key] = `${key} yangilandi`
+            continue
+          }
+          safeBody[key] = val
+        }
 
         const detailString =
           Object.keys(safeBody).length > 0
-            ? JSON.stringify(safeBody).slice(0, 500)
+            ? JSON.stringify(safeBody).slice(0, 280)
             : `${entity} ${action.toLowerCase()}`
 
         const logEntry = await AuditLog.create({

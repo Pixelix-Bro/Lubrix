@@ -1,10 +1,18 @@
 import axios from 'axios'
-import { Branch, Organization, TelegramIntegration } from '../../models/index.js'
+import {
+  Branch,
+  Organization,
+  Product,
+  TelegramCommand,
+  TelegramIntegration,
+} from '../../models/index.js'
+import { DEFAULT_BOT_COMMANDS } from './commandTemplates.js'
+
+function formatMoney(n) {
+  return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
 
 export class TelegramService {
-  /**
-   * Verify Telegram Bot Token by calling getMe
-   */
   static async verifyBotToken(token) {
     try {
       const response = await axios.get(`https://api.telegram.org/bot${token}/getMe`, {
@@ -13,7 +21,7 @@ export class TelegramService {
       if (response.data && response.data.ok) {
         return {
           valid: true,
-          bot: response.data.result, // id, is_bot, first_name, username
+          bot: response.data.result,
         }
       }
       return { valid: false, error: 'Telegram javob bermadi' }
@@ -28,32 +36,58 @@ export class TelegramService {
     }
   }
 
-  /**
-   * Send text message via business bot
-   */
   static async sendMessage({ botToken, chatId, text, parseMode = 'HTML', replyMarkup }) {
-    try {
-      const payload = {
-        chat_id: chatId,
-        text,
-        parse_mode: parseMode,
-      }
-      if (replyMarkup) {
-        payload.reply_markup = replyMarkup
-      }
-      const res = await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, payload, {
-        timeout: 8000,
-      })
-      return res.data
-    } catch (err) {
-      console.error('Telegram sendMessage error:', err.response?.data || err.message)
-      throw err
+    const payload = {
+      chat_id: chatId,
+      text,
+      parse_mode: parseMode,
     }
+    if (replyMarkup) payload.reply_markup = replyMarkup
+    const res = await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, payload, {
+      timeout: 8000,
+    })
+    return res.data
   }
 
-  /**
-   * Handle incoming Webhook update from Telegram
-   */
+  static async ensureDefaultCommands(organizationId) {
+    const count = await TelegramCommand.countDocuments({ organizationId })
+    if (count > 0) return
+    await TelegramCommand.insertMany(
+      DEFAULT_BOT_COMMANDS.map((c) => ({ ...c, organizationId, isActive: true }))
+    )
+  }
+
+  static async renderTemplate(organizationId, template) {
+    const org = await Organization.findById(organizationId)
+    const branches = await Branch.find({ organizationId, isActive: true })
+    const products = await Product.find({ organizationId, isArchived: { $ne: true } }).limit(20)
+
+    const branchText =
+      branches.length === 0
+        ? 'Filiallar hali qo‘shilmagan.'
+        : branches
+            .map(
+              (b, i) =>
+                `${i + 1}. ${b.name}\nManzil: ${b.address || '—'}\nIsh vaqti: ${b.workingHours || '—'}\nTel: ${b.phone || '—'}`
+            )
+            .join('\n\n')
+
+    const productText =
+      products.length === 0
+        ? 'Mahsulotlar hali qo‘shilmagan.'
+        : products
+            .map((p) => `• ${p.brand} ${p.name} — ${formatMoney(p.price)} UZS`)
+            .join('\n')
+
+    return String(template || '')
+      .replaceAll('{{org_name}}', org?.name || 'Servis')
+      .replaceAll('{{org_phone}}', org?.phone || '—')
+      .replaceAll('{{org_address}}', org?.address || '—')
+      .replaceAll('{{org_email}}', org?.email || '—')
+      .replaceAll('{{branches}}', branchText)
+      .replaceAll('{{products}}', productText)
+  }
+
   static async handleWebhookUpdate(organizationId, update) {
     const integration = await TelegramIntegration.findOne({ organizationId, isActive: true })
     if (!integration) return
@@ -63,78 +97,46 @@ export class TelegramService {
 
     const chatId = message.chat.id
     const text = message.text.trim()
-    const org = await Organization.findById(organizationId)
-    const orgName = org?.name || 'Lubrix Avto Servis'
+    const commandKey = text.split(/\s+/)[0].split('@')[0].toLowerCase()
 
-    // 1. /start command
-    if (text === '/start') {
-      const welcome =
-        `Assalomu alaykum! <b>${orgName}</b> rasmiy moy almashtirish xizmati botiga xush kelibsiz.\n\n` +
-        `Ushbu bot orqali siz navbatga yozilishingiz, filiallarimiz manzilini olishingiz va moy almashtirish tarixingizni kuzatishingiz mumkin.`
+    await this.ensureDefaultCommands(organizationId)
+    const commands = await TelegramCommand.find({ organizationId, isActive: true })
+    const matched = commands.find((c) => c.command.toLowerCase() === commandKey)
 
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: 'Xizmatga Yozilish (Bron)', callback_data: 'book_service' },
-            { text: 'Filiallar & Manzillar', callback_data: 'view_branches' },
-          ],
-          [
-            { text: 'Mening Avtomobillarim', callback_data: 'my_vehicles' },
-            { text: 'Biz Bilan Bog‘lanish', callback_data: 'contact_support' },
-          ],
-        ],
-      }
-
+    if (matched) {
+      const body = await this.renderTemplate(organizationId, matched.responseTemplate)
       await this.sendMessage({
         botToken: integration.botToken,
         chatId,
-        text: welcome,
-        replyMarkup: keyboard,
+        text: body,
+        parseMode: undefined,
       })
       return
     }
 
-    // 2. /branches command
-    if (text === '/branches') {
-      const branches = await Branch.find({ organizationId, isActive: true })
-      let branchText = `<b>${orgName} Filiallari:</b>\n\n`
-      branches.forEach((b, i) => {
-        branchText += `${i + 1}. <b>${b.name}</b>\nManzil: ${b.address}\nIsh vaqti: ${b.workingHours}\nTel: ${b.phone || '—'}\n\n`
-      })
-
-      await this.sendMessage({
-        botToken: integration.botToken,
-        chatId,
-        text: branchText,
-      })
-      return
-    }
-
-    // Default response
     await this.sendMessage({
       botToken: integration.botToken,
       chatId,
-      text: `Hurmatli mijoz, buyruqni tanlash uchun /start bosing yoki operatorimiz bilan bog‘laning: ${org?.phone || '+998712001122'}`,
+      text: 'Buyruq topilmadi. /start yuboring yoki sozlamalarda buyruqlarni tekshiring.',
+      parseMode: undefined,
     })
   }
 
-  /**
-   * Notify Business Owner via Telegram
-   */
   static async notifyOwner(organizationId, eventType, data) {
     try {
       const integration = await TelegramIntegration.findOne({ organizationId, isActive: true })
       if (!integration || !integration.ownerTelegramChatId) return
-
       if (!integration.notifications?.[eventType]) return
 
       let msg = ''
       if (eventType === 'newBooking') {
-        msg = `<b>Yangi Bron Qabul Qilindi!</b>\n\nMijoz: ${data.customerName}\nTel: ${data.customerPhone}\nSana: ${data.bookingDate} ${data.bookingTime}\nXizmat: ${data.serviceType}`
+        msg = `Yangi bron\nMijoz: ${data.customerName}\nTel: ${data.customerPhone}\nSana: ${data.bookingDate} ${data.bookingTime}`
       } else if (eventType === 'serviceCompleted') {
-        msg = `<b>Xizmat Yakunlandi</b>\n\nMijoz: ${data.customerName}\nAvto: ${data.vehicle} (${data.plate})\nSumma: ${Number(data.price).toLocaleString()} UZS`
+        msg = `Xizmat yakunlandi\nMijoz: ${data.customerName}\nAvto: ${data.vehicle || ''} (${data.plate || ''})\nSumma: ${formatMoney(data.price)} UZS`
       } else if (eventType === 'lowStock') {
-        msg = `<b>Diqqat: Ombor Qoldig‘i Kamaydi!</b>\n\nMahsulot: ${data.productName}\nQoldiq: ${data.quantity} L`
+        msg = `Ombor qoldig‘i kam\nMahsulot: ${data.productName}\nQoldiq: ${data.quantity}`
+      } else if (eventType === 'planExpiry') {
+        msg = `Obuna tugashiga ${data.daysLeft} kun qoldi.`
       }
 
       if (msg) {
@@ -142,6 +144,7 @@ export class TelegramService {
           botToken: integration.botToken,
           chatId: integration.ownerTelegramChatId,
           text: msg,
+          parseMode: undefined,
         })
       }
     } catch (e) {

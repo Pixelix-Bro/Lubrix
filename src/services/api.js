@@ -103,6 +103,7 @@ export const lubrixApi = {
   // Payment Cards (Only OWNER)
   getPaymentCards: () => apiClient.get('/settings/cards'),
   addPaymentCard: (data) => apiClient.post('/settings/cards', data),
+  updatePaymentCard: (id, data) => apiClient.put(`/settings/cards/${id}`, data),
   deletePaymentCard: (id) => apiClient.delete(`/settings/cards/${id}`),
 
   // Service Lane Camera ANPR Settings
@@ -112,6 +113,7 @@ export const lubrixApi = {
   // Product Categories
   getCategories: () => apiClient.get('/settings/categories'),
   createCategory: (data) => apiClient.post('/settings/categories', data),
+  updateCategory: (id, data) => apiClient.put(`/settings/categories/${id}`, data),
   deleteCategory: (id) => apiClient.delete(`/settings/categories/${id}`),
 
   // Audit Logs
@@ -123,6 +125,18 @@ export const lubrixApi = {
   saveTelegramIntegration: (data) => apiClient.post('/integrations/telegram/save', data),
   disconnectTelegram: () => apiClient.post('/integrations/telegram/disconnect'),
   sendTelegramTest: (chatId) => apiClient.post('/integrations/telegram/test', { chatId }),
+  getTelegramCommands: () => apiClient.get('/integrations/telegram/commands'),
+  saveTelegramCommand: (data) => apiClient.post('/integrations/telegram/commands', data),
+  deleteTelegramCommand: (id) => apiClient.delete(`/integrations/telegram/commands/${id}`),
+
+  getCampaigns: () => apiClient.get('/notifications/campaigns'),
+  previewCampaign: (segment) => apiClient.get('/notifications/campaigns/preview', { params: { segment } }),
+  launchCampaign: (data) => apiClient.post('/notifications/campaigns/launch', data),
+  getSmsTemplates: () => apiClient.get('/notifications/templates'),
+  saveSmsTemplate: (data) => apiClient.post('/notifications/templates', data),
+  deleteSmsTemplate: (id) => apiClient.delete(`/notifications/templates/${id}`),
+  getInbox: () => apiClient.get('/notifications/inbox'),
+  markInboxRead: () => apiClient.post('/notifications/inbox/read'),
 
   // Inventory & Products
   getInventoryDashboard: (branchId) =>
@@ -147,6 +161,7 @@ export const lubrixApi = {
   // Payments & Invoices (Click, Payme, Uzum, POS Terminal)
   createPaymentIntent: (data) => apiClient.post('/payments/create-intent', data),
   posCharge: (data) => apiClient.post('/payments/pos-charge', data),
+  confirmPosPayment: (data) => apiClient.post('/payments/pos-confirm', data),
   getTransactions: (params = {}) => apiClient.get('/payments/transactions', { params }),
   getInvoices: () => apiClient.get('/payments/invoices'),
   createInvoice: (data) => apiClient.post('/payments/invoices', data),

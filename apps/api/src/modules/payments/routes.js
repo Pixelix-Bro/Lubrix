@@ -12,6 +12,8 @@ router.post('/payme', PaymentsController.handlePayme);
 // Authenticated Payment endpoints
 router.post('/create-intent', requireAuth, PaymentsController.createPaymentIntent);
 router.post('/pos-charge', requireAuth, PaymentsController.posCharge);
+router.post('/pos-confirm', requireAuth, PaymentsController.confirmPosPayment);
+router.get('/transactions/:id', requireAuth, PaymentsController.getTransaction);
 router.get('/transactions', requireAuth, PaymentsController.getTransactions);
 router.get('/invoices', requireAuth, PaymentsController.getInvoices);
 router.post('/invoices', requireAuth, PaymentsController.createInvoice);

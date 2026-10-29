@@ -61,17 +61,39 @@ export const getCustomerById = async (req, res, next) => {
 
 export const createCustomer = async (req, res, next) => {
   try {
-    const { fullName, phone, email, preferredLocale = 'uz' } = req.body;
+    const { fullName, phone, email, preferredLocale = 'uz', customerType = 'REGULAR' } = req.body;
+    const isWalkIn = customerType === 'WALK_IN';
     const rawPhone = phone || req.body.phoneE164;
 
-    if (!fullName || !rawPhone) {
+    if (!fullName) {
       return res.status(400).json({
         success: false,
-        error: 'Ism va telefon raqami kiritilishi shart'
+        error: 'Ism kiritilishi shart'
+      });
+    }
+    if (!isWalkIn && !rawPhone) {
+      return res.status(400).json({
+        success: false,
+        error: 'Doimiy mijoz uchun telefon raqami shart'
       });
     }
 
-    const phoneE164 = normalizePhoneE164(rawPhone);
+    const phoneE164 = rawPhone ? normalizePhoneE164(rawPhone) : `WALKIN-${Date.now()}`;
+
+    if (!isWalkIn && rawPhone) {
+      const existing = await Customer.findOne({
+        organizationId: req.organizationId,
+        phoneE164,
+        customerType: { $ne: 'WALK_IN' },
+      });
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          error: 'Bu telefon raqam bilan mijoz allaqachon mavjud. Faqat shu profil ishlatiladi.',
+          data: existing,
+        });
+      }
+    }
 
     const newCustomer = await Customer.create({
       organizationId: req.organizationId,
@@ -79,7 +101,8 @@ export const createCustomer = async (req, res, next) => {
       phoneE164,
       email: email ? email.trim() : undefined,
       preferredLocale,
-      smsConsentAt: new Date()
+      customerType: isWalkIn ? 'WALK_IN' : 'REGULAR',
+      smsConsentAt: isWalkIn ? undefined : new Date()
     });
 
     emitTenantEvent(req.organizationId, 'customer:created', newCustomer);

@@ -1,4 +1,4 @@
-import { Customer, Vehicle, ServiceRecord, Reminder } from '../../models/index.js';
+import { Customer, Vehicle, ServiceRecord, Reminder, Organization } from '../../models/index.js';
 
 // ─── Dashboard: bugungi va oylik statistika ───────────────────────────────────
 export const getDashboard = async (req, res, next) => {
@@ -76,10 +76,10 @@ export const getOverview = async (req, res, next) => {
         vehiclesCount,
         pendingReminders,
         stats: [
-          { label: 'Jami tushum',               value: `${totalRevenue.toLocaleString()} so'm`, delta: '+14.2%', positive: true,  icon: 'CircleDollarSign' },
-          { label: 'Xizmatlar',                  value: `${services.length} ta`,                 delta: '+3 ta',   positive: true,  icon: 'Settings2'        },
-          { label: 'Mijozlar',                   value: `${customersCount} ta`,                  delta: '+2 ta',   positive: true,  icon: 'UsersRound'       },
-          { label: 'Kutilayotgan eslatmalar',    value: `${pendingReminders} ta`,                delta: '-1 ta',   positive: false, icon: 'Clock3'           },
+          { label: 'Jami tushum',               value: `${totalRevenue.toLocaleString()} so'm`, delta: '', positive: true,  icon: 'CircleDollarSign' },
+          { label: 'Xizmatlar',                  value: `${services.length} ta`,                 delta: '',   positive: true,  icon: 'Settings2'        },
+          { label: 'Mijozlar',                   value: `${customersCount} ta`,                  delta: '',   positive: true,  icon: 'UsersRound'       },
+          { label: 'Kutilayotgan eslatmalar',    value: `${pendingReminders} ta`,                delta: '',   positive: false, icon: 'Clock3'           },
         ],
       },
     });
@@ -91,6 +91,8 @@ export const getReports = async (req, res, next) => {
   try {
     const orgId = req.organizationId;
     const now   = new Date();
+    const org = await Organization.findById(orgId);
+    const startedYear = org?.createdAt ? new Date(org.createdAt).getFullYear() : now.getFullYear();
     const year  = parseInt(req.query.year) || now.getFullYear();
 
     // 12 oy uchun: har oy servicelar
@@ -158,10 +160,15 @@ export const getReports = async (req, res, next) => {
     // Mijozlar statistikasi
     const totalCustomers = await Customer.countDocuments({ organizationId: orgId });
 
+    const years = []
+    for (let y = startedYear; y <= now.getFullYear(); y += 1) years.push(y)
+
     res.json({
       success: true,
       data: {
         year,
+        startedYear,
+        years,
         monthlyData,
         brandData,
         stats: {

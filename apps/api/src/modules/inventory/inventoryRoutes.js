@@ -17,7 +17,7 @@ export const initInventoryRoutes = (app, emitTenantEvent) => {
         Inventory.find(invFilter),
         Product.countDocuments({
           isArchived: false,
-          $or: [{ organizationId: orgId }, { organizationId: null }, { organizationId: { $exists: false } }]
+          organizationId: orgId,
         }),
         StockMovement.find({ organizationId: orgId }).sort({ createdAt: -1 }).limit(5)
       ]);
@@ -76,7 +76,7 @@ export const initInventoryRoutes = (app, emitTenantEvent) => {
 
       const filter = {
         isArchived: false,
-        $or: [{ organizationId: orgId }, { organizationId: null }, { organizationId: { $exists: false } }]
+        organizationId: orgId,
       };
 
       if (brand) filter.brand = { $regex: brand, $options: 'i' };
@@ -106,9 +106,12 @@ export const initInventoryRoutes = (app, emitTenantEvent) => {
 
   app.post('/api/v1/products', requireAuth, async (req, res, next) => {
     try {
-      const { name, brand, category, oilType, viscosity, barcode, standards, packageSizes, description } = req.body;
+      const { name, brand, category, oilType, viscosity, barcode, standards, packageSizes, description, price, purchasePrice } = req.body;
       if (!name || !brand) {
-        return res.status(400).json({ success: false, error: "name va brand kiritilishi shart" });
+        return res.status(400).json({ success: false, error: "Nomi va brendi kiritilishi shart" });
+      }
+      if (price === undefined || price === null || Number(price) < 0) {
+        return res.status(400).json({ success: false, error: "Sotish narxi kiritilishi shart" });
       }
 
       const newProd = await Product.create({
@@ -117,11 +120,13 @@ export const initInventoryRoutes = (app, emitTenantEvent) => {
         brand: brand.trim(),
         category: category || "Engine Oil",
         oilType: oilType || "Synthetic",
-        viscosity: viscosity || "5W-30",
+        viscosity: viscosity || "",
         barcode: barcode || "",
         standards: Array.isArray(standards) ? standards : [standards].filter(Boolean),
-        packageSizes: Array.isArray(packageSizes) ? packageSizes : ["1L", "4L"],
+        packageSizes: Array.isArray(packageSizes) ? packageSizes : [],
         description: description || "",
+        price: Number(price) || 0,
+        purchasePrice: Number(purchasePrice) || 0,
         isArchived: false
       });
 
@@ -358,10 +363,10 @@ export const initInventoryRoutes = (app, emitTenantEvent) => {
   app.put('/api/v1/products/:id', requireAuth, async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { name, brand, category, oilType, viscosity, barcode, standards, price, purchasePrice } = req.body;
+      const { name, brand, category, oilType, viscosity, barcode, standards, packageSizes, description, price, purchasePrice } = req.body;
       const updated = await Product.findOneAndUpdate(
-        { _id: id },
-        { $set: { name, brand, category, oilType, viscosity, barcode, standards, price, purchasePrice } },
+        { _id: id, organizationId: req.organizationId },
+        { $set: { name, brand, category, oilType, viscosity, barcode, standards, packageSizes, description, price, purchasePrice } },
         { new: true }
       );
       if (!updated) return res.status(404).json({ success: false, error: 'Mahsulot topilmadi' });
