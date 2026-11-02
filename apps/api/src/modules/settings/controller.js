@@ -1,22 +1,79 @@
 import {
   AuditLog,
+  AuthSession,
   CameraSetting,
   Organization,
   PaymentCard,
   ProductCategory,
   User,
 } from '../../models/index.js'
+import { buildAuditQuery } from './auditQuery.js'
+
+const ORGANIZATION_SETTINGS_FIELDS = [
+  'name',
+  'countryCode',
+  'timezone',
+  'currency',
+  'defaultLocale',
+  'phone',
+  'email',
+  'address',
+  'logoUrl',
+]
+const SETTINGS_FIELDS = [
+  'smsSender',
+  'smsProvider',
+  'autoReminders',
+  'workingDays',
+  'tableDensity',
+  'lowStockThreshold',
+]
+
+export const buildSettingsUpdate = ({ organization, settings } = {}) => {
+  const updateData = {}
+
+  if (organization && typeof organization === 'object' && !Array.isArray(organization)) {
+    for (const field of ORGANIZATION_SETTINGS_FIELDS) {
+      if (Object.hasOwn(organization, field)) {
+        updateData[field] =
+          typeof organization[field] === 'string' ? organization[field].trim() : organization[field]
+      }
+    }
+  }
+
+  if (settings && typeof settings === 'object' && !Array.isArray(settings)) {
+    for (const field of SETTINGS_FIELDS) {
+      if (Object.hasOwn(settings, field)) updateData[`settings.${field}`] = settings[field]
+    }
+
+    if (settings.smsTemplates && typeof settings.smsTemplates === 'object') {
+      for (const template of ['dueSoon', 'overdue']) {
+        if (Object.hasOwn(settings.smsTemplates, template)) {
+          updateData[`settings.smsTemplates.${template}`] = settings.smsTemplates[template]
+        }
+      }
+    }
+  }
+
+  return updateData
+}
 
 export const SettingsController = {
   // 1. Get General Settings
   async getSettings(req, res, next) {
     try {
       const org = await Organization.findById(req.organizationId)
+      if (!org) {
+        return res.status(404).json({
+          success: false,
+          error: 'Tashkilot topilmadi. Hisob tashkilotiga kirishni tekshiring.',
+        })
+      }
       res.json({
         success: true,
         data: {
           organization: org,
-          settings: org?.settings || {},
+          settings: org.settings || {},
         },
       })
     } catch (err) {
@@ -27,30 +84,25 @@ export const SettingsController = {
   // 2. Update General Settings
   async updateSettings(req, res, next) {
     try {
-      const { organization, settings } = req.body
-      const updateData = {}
-
-      if (organization) {
-        if (organization.name) updateData.name = organization.name
-        if (organization.countryCode) updateData.countryCode = organization.countryCode
-        if (organization.timezone) updateData.timezone = organization.timezone
-        if (organization.currency) updateData.currency = organization.currency
-        if (organization.defaultLocale) updateData.defaultLocale = organization.defaultLocale
-        if (organization.phone) updateData.phone = organization.phone
-        if (organization.email) updateData.email = organization.email
-        if (organization.address) updateData.address = organization.address
-        if (organization.logoUrl) updateData.logoUrl = organization.logoUrl
-      }
-
-      if (settings) {
-        updateData.settings = settings
+      const { organization } = req.body
+      const updateData = buildSettingsUpdate(req.body)
+      if (Object.hasOwn(organization || {}, 'name') && !updateData.name) {
+        return res
+          .status(400)
+          .json({ success: false, error: 'Tashkilot nomi bo‘sh bo‘lmasligi kerak' })
       }
 
       const updated = await Organization.findByIdAndUpdate(
         req.organizationId,
         { $set: updateData },
-        { new: true }
+        { returnDocument: 'after', runValidators: true }
       )
+      if (!updated) {
+        return res.status(404).json({
+          success: false,
+          error: 'Tashkilot topilmadi. Hisob tashkilotiga kirishni tekshiring.',
+        })
+      }
 
       // Audit Log
       await AuditLog.create({
@@ -81,6 +133,7 @@ export const SettingsController = {
       if (phone) user.phone = phone
       if (avatarUrl !== undefined) user.avatarUrl = avatarUrl
 
+      let passwordChanged = false
       if (newPassword) {
         const bcrypt = await import('bcryptjs')
         if (!currentPassword) {
@@ -90,10 +143,22 @@ export const SettingsController = {
         if (!isMatch) {
           return res.status(400).json({ success: false, error: 'Joriy parol noto‘g‘ri' })
         }
+        if (String(newPassword).length < 8) {
+          return res
+            .status(400)
+            .json({ success: false, error: 'Yangi parol kamida 8 belgidan iborat bo‘lishi kerak' })
+        }
         user.passwordHash = await bcrypt.default.hash(newPassword, 12)
+        passwordChanged = true
       }
 
       await user.save()
+      if (passwordChanged) {
+        await AuthSession.updateMany(
+          { userId: req.userId, _id: { $ne: req.authSession?._id }, revokedAt: null },
+          { $set: { revokedAt: new Date() } }
+        )
+      }
 
       res.json({
         success: true,
@@ -284,10 +349,27 @@ export const SettingsController = {
   // 6. Audit Logs
   async getAuditLogs(req, res, next) {
     try {
-      const logs = await AuditLog.find({ organizationId: req.organizationId })
-        .sort({ createdAt: -1 })
-        .limit(100)
-      res.json({ success: true, data: logs })
+      const query = buildAuditQuery(req.query)
+      if (query.error) return res.status(400).json({ success: false, error: query.error })
+
+      const filter = {
+        organizationId: req.organizationId,
+        ...query.filter,
+        path: { $not: /\/settings\/profile(?:\?|$)/ },
+      }
+      const [total, logs] = await Promise.all([
+        AuditLog.countDocuments(filter),
+        AuditLog.find(filter).sort({ createdAt: -1 }).skip(query.skip).limit(query.limit),
+      ])
+
+      res.json({
+        success: true,
+        data: logs,
+        total,
+        page: query.page,
+        limit: query.limit,
+        pages: Math.ceil(total / query.limit),
+      })
     } catch (err) {
       next(err)
     }

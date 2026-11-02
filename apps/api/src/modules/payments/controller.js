@@ -1,11 +1,20 @@
 import {
   Inventory,
   Invoice,
+  Product,
   ServiceRecord,
   StockMovement,
   Transaction,
 } from '../../models/index.js'
 import { emitTenantEvent } from '../../realtime/socket.js'
+import { TelegramService } from '../telegram/telegramService.js'
+import {
+  canManuallyConfirmPosPayment,
+  isClickConfigured,
+  isPaymeConfigured,
+  verifyClickSignature,
+  verifyPaymeAuthorization,
+} from './providerAuth.js'
 
 export const PaymentsController = {
   // 1. Create Payment Intent (Click, Payme, Uzum, Card)
@@ -21,8 +30,25 @@ export const PaymentsController = {
         notes,
       } = req.body
 
-      if (!amount || Number(amount) <= 0) {
+      const normalizedAmount = Number(amount)
+      const normalizedProvider = String(provider).toUpperCase()
+      if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
         return res.status(400).json({ success: false, error: 'To‘lov summasi noto‘g‘ri kiritildi' })
+      }
+      if (!['CLICK', 'PAYME'].includes(normalizedProvider)) {
+        return res
+          .status(400)
+          .json({ success: false, error: 'To‘lov provayderi qo‘llab-quvvatlanmaydi' })
+      }
+      if (normalizedProvider === 'CLICK' && !isClickConfigured()) {
+        return res
+          .status(503)
+          .json({ success: false, error: 'Click merchant sozlamalari to‘ldirilmagan' })
+      }
+      if (normalizedProvider === 'PAYME' && !isPaymeConfigured()) {
+        return res
+          .status(503)
+          .json({ success: false, error: 'Payme merchant sozlamalari to‘ldirilmagan' })
       }
 
       const merchantTransId = `LUBRIX-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`
@@ -32,9 +58,9 @@ export const PaymentsController = {
         serviceId: serviceId || null,
         customerId: customerId || null,
         customerName: customerName || 'Bir martalik mijoz',
-        amount: Number(amount),
+        amount: normalizedAmount,
         currency: 'UZS',
-        provider: provider.toUpperCase(),
+        provider: normalizedProvider,
         paymentStatus: 'PENDING',
         merchantTransactionId: merchantTransId,
         items: items || [],
@@ -44,14 +70,18 @@ export const PaymentsController = {
 
       // Generate payment URLs based on provider
       let paymentUrl = ''
-      if (provider.toUpperCase() === 'CLICK') {
-        const serviceId = process.env.CLICK_SERVICE_ID || '12345'
-        const merchantId = process.env.CLICK_MERCHANT_ID || '67890'
-        paymentUrl = `https://my.click.uz/services/pay?service_id=${serviceId}&merchant_id=${merchantId}&amount=${amount}&transaction_param=${transaction._id}`
-      } else if (provider.toUpperCase() === 'PAYME') {
-        const merchantId = process.env.PAYME_MERCHANT_ID || '6000000000000000'
+      if (normalizedProvider === 'CLICK') {
+        const params = new URLSearchParams({
+          service_id: process.env.CLICK_SERVICE_ID,
+          merchant_id: process.env.CLICK_MERCHANT_ID,
+          amount: String(normalizedAmount),
+          transaction_param: merchantTransId,
+        })
+        paymentUrl = `https://my.click.uz/services/pay?${params}`
+      } else if (normalizedProvider === 'PAYME') {
+        const merchantId = process.env.PAYME_MERCHANT_ID
         const base64Params = Buffer.from(
-          `m=${merchantId};ac.order_id=${transaction._id};a=${amount * 100}`
+          `m=${merchantId};ac.order_id=${transaction._id};a=${normalizedAmount * 100}`
         ).toString('base64')
         paymentUrl = `https://checkout.paycom.uz/${base64Params}`
       } else if (provider.toUpperCase() === 'UZUM') {
@@ -87,31 +117,43 @@ export const PaymentsController = {
         notes,
       } = req.body
 
-      if (!amount || Number(amount) <= 0) {
+      if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
         return res.status(400).json({ success: false, error: 'To‘lov summasi noto‘g‘ri' })
       }
 
       const receiptNumber = `RCP-${Date.now().toString().slice(-6)}`
       const merchantTransId = `POS-${Date.now()}`
       const method = String(provider || 'CASH').toUpperCase()
+      if (!['CASH', 'UZCARD', 'HUMO', 'CLICK', 'PAYME', 'TERMINAL'].includes(method)) {
+        return res
+          .status(400)
+          .json({ success: false, error: 'To‘lov usuli qo‘llab-quvvatlanmaydi' })
+      }
+      if (method === 'CLICK' && !isClickConfigured()) {
+        return res
+          .status(503)
+          .json({ success: false, error: 'Click merchant sozlamalari to‘ldirilmagan' })
+      }
+      if (method === 'PAYME' && !isPaymeConfigured()) {
+        return res
+          .status(503)
+          .json({ success: false, error: 'Payme merchant sozlamalari to‘ldirilmagan' })
+      }
       const isCash = method === 'CASH'
       const paymentStatus = isCash ? 'PAID' : 'PENDING'
 
       let paymentUrl = ''
+      let paymeMerchantId = ''
       if (method === 'CLICK') {
-        const clickServiceId = process.env.CLICK_SERVICE_ID || ''
-        const merchantId = process.env.CLICK_MERCHANT_ID || ''
-        paymentUrl = clickServiceId
-          ? `https://my.click.uz/services/pay?service_id=${clickServiceId}&merchant_id=${merchantId}&amount=${amount}&transaction_param=${merchantTransId}`
-          : ''
+        const params = new URLSearchParams({
+          service_id: process.env.CLICK_SERVICE_ID,
+          merchant_id: process.env.CLICK_MERCHANT_ID,
+          amount: String(amount),
+          transaction_param: merchantTransId,
+        })
+        paymentUrl = `https://my.click.uz/services/pay?${params}`
       } else if (method === 'PAYME') {
-        const merchantId = process.env.PAYME_MERCHANT_ID || ''
-        if (merchantId) {
-          const base64Params = Buffer.from(
-            `m=${merchantId};ac.order_id=${merchantTransId};a=${Number(amount) * 100}`
-          ).toString('base64')
-          paymentUrl = `https://checkout.paycom.uz/${base64Params}`
-        }
+        paymeMerchantId = process.env.PAYME_MERCHANT_ID
       }
 
       const transaction = await Transaction.create({
@@ -131,6 +173,13 @@ export const PaymentsController = {
         notes: notes || (isCash ? 'Naqd POS to‘lovi' : 'Karta/QR to‘lovi kutilmoqda'),
         createdByUserId: req.userId,
       })
+
+      if (method === 'PAYME') {
+        const base64Params = Buffer.from(
+          `m=${paymeMerchantId};ac.order_id=${transaction._id};a=${Number(amount) * 100}`
+        ).toString('base64')
+        paymentUrl = `https://checkout.paycom.uz/${base64Params}`
+      }
 
       if (!isCash) {
         return res.status(201).json({
@@ -203,6 +252,7 @@ export const PaymentsController = {
             organizationId: req.organizationId,
             productId: item.productId,
           })
+          if (!inv) continue
           const qty = Number(inv.quantity ?? inv.currentQuantity ?? 0)
           if (inv && qty >= item.quantity) {
             const before = qty
@@ -221,6 +271,16 @@ export const PaymentsController = {
               reason: `POS chek #${receiptNumber}`,
               userName: req.user?.name || 'Kassir',
             })
+            if (before > inv.minStockLevel && after <= inv.minStockLevel) {
+              const product = await Product.findOne({
+                _id: item.productId,
+                organizationId: req.organizationId,
+              })
+              await TelegramService.notifyOwner(req.organizationId, 'lowStock', {
+                productName: product?.name || item.name || 'Mahsulot',
+                quantity: after,
+              })
+            }
           }
         }
       }
@@ -262,6 +322,12 @@ export const PaymentsController = {
       if (trans.paymentStatus === 'PAID') {
         return res.json({ success: true, data: trans })
       }
+      if (!canManuallyConfirmPosPayment(trans.provider)) {
+        return res.status(409).json({
+          success: false,
+          error: 'Ushbu to‘lov faqat to‘lov provayderining server tasdig‘i bilan yakunlanadi',
+        })
+      }
 
       trans.paymentStatus = 'PAID'
       trans.paidAt = new Date()
@@ -292,6 +358,16 @@ export const PaymentsController = {
             reason: `POS chek #${trans.receiptNumber}`,
             userName: req.user?.name || 'Kassir',
           })
+          if (before > inv.minStockLevel && after <= inv.minStockLevel) {
+            const product = await Product.findOne({
+              _id: item.productId,
+              organizationId: req.organizationId,
+            })
+            await TelegramService.notifyOwner(req.organizationId, 'lowStock', {
+              productName: product?.name || item.name || 'Mahsulot',
+              quantity: after,
+            })
+          }
         }
       }
 
@@ -354,7 +430,19 @@ export const PaymentsController = {
     try {
       const { click_trans_id, merchant_trans_id, amount } = req.body
 
-      const trans = await Transaction.findOne({ merchantTransactionId: merchant_trans_id })
+      if (!verifyClickSignature(req.body, 0)) {
+        return res.json({
+          click_trans_id,
+          merchant_trans_id,
+          error: -1,
+          error_note: 'Sign check failed',
+        })
+      }
+
+      const trans = await Transaction.findOne({
+        merchantTransactionId: merchant_trans_id,
+        provider: 'CLICK',
+      })
       if (!trans) {
         return res.json({
           click_trans_id,
@@ -372,6 +460,14 @@ export const PaymentsController = {
           error_note: 'Summa mos kelmadi',
         })
       }
+      if (trans.paymentStatus !== 'PENDING') {
+        return res.json({
+          click_trans_id,
+          merchant_trans_id,
+          error: -4,
+          error_note: 'Payment is not pending',
+        })
+      }
 
       return res.json({
         click_trans_id,
@@ -380,22 +476,62 @@ export const PaymentsController = {
         error: 0,
         error_note: 'Success',
       })
-    } catch (err) {
-      return res.json({ error: -8, error_note: err.message })
+    } catch {
+      return res.json({ error: -8, error_note: 'Internal error' })
     }
   },
 
   async handleClickComplete(req, res) {
     try {
-      const { click_trans_id, merchant_trans_id, merchant_prepare_id, error } = req.body
+      const { click_trans_id, merchant_trans_id, merchant_prepare_id, amount, error } = req.body
 
-      const trans = await Transaction.findById(merchant_prepare_id)
+      if (!verifyClickSignature(req.body, 1)) {
+        return res.json({
+          click_trans_id,
+          merchant_trans_id,
+          error: -1,
+          error_note: 'Sign check failed',
+        })
+      }
+
+      const trans = await Transaction.findOne({
+        _id: merchant_prepare_id,
+        merchantTransactionId: merchant_trans_id,
+        provider: 'CLICK',
+      })
       if (!trans) {
         return res.json({
           click_trans_id,
           merchant_trans_id,
           error: -5,
           error_note: 'Tranzaksiya topilmadi',
+        })
+      }
+
+      if (Number(trans.amount) !== Number(amount)) {
+        return res.json({
+          click_trans_id,
+          merchant_trans_id,
+          error: -2,
+          error_note: 'Incorrect amount',
+        })
+      }
+
+      if (trans.paymentStatus === 'PAID') {
+        return res.json({
+          click_trans_id,
+          merchant_trans_id,
+          merchant_confirm_id: trans._id.toString(),
+          error: 0,
+          error_note: 'Success',
+        })
+      }
+      if (trans.paymentStatus !== 'PENDING') {
+        return res.json({
+          click_trans_id,
+          merchant_trans_id,
+          error: -4,
+          error_note: 'Payment is not pending',
         })
       }
 
@@ -423,19 +559,25 @@ export const PaymentsController = {
         error: 0,
         error_note: 'Success',
       })
-    } catch (err) {
-      return res.json({ error: -8, error_note: err.message })
+    } catch {
+      return res.json({ error: -8, error_note: 'Internal error' })
     }
   },
 
   // 4. Payme Webhook Handler (JSON-RPC)
   async handlePayme(req, res) {
-    const { method, params, id } = req.body
+    const { method, params = {}, id } = req.body || {}
+    if (!verifyPaymeAuthorization(req.headers.authorization)) {
+      return res.status(200).json({
+        error: { code: -32504, message: { uz: 'Ruxsat berilmagan' } },
+        id,
+      })
+    }
 
     try {
       if (method === 'CheckPerformTransaction') {
         const trans = await Transaction.findById(params.account?.order_id)
-        if (!trans) {
+        if (!trans || trans.provider !== 'PAYME') {
           return res.json({
             error: {
               code: -31050,
@@ -444,14 +586,26 @@ export const PaymentsController = {
             id,
           })
         }
+        if (Number(params.amount) !== Number(trans.amount) * 100) {
+          return res.json({ error: { code: -31001, message: { uz: 'Summa noto‘g‘ri' } }, id })
+        }
         return res.json({ result: { allow: true }, id })
       }
 
       if (method === 'CreateTransaction') {
         const trans = await Transaction.findById(params.account?.order_id)
-        if (!trans) {
+        if (!trans || trans.provider !== 'PAYME') {
           return res.json({
             error: { code: -31050, message: { uz: 'Buyurtma topilmadi' } },
+            id,
+          })
+        }
+        if (Number(params.amount) !== Number(trans.amount) * 100) {
+          return res.json({ error: { code: -31001, message: { uz: 'Summa noto‘g‘ri' } }, id })
+        }
+        if (trans.paymentStatus !== 'PENDING') {
+          return res.json({
+            error: { code: -31008, message: { uz: 'Buyurtma muddati tugagan' } },
             id,
           })
         }
@@ -470,9 +624,25 @@ export const PaymentsController = {
       }
 
       if (method === 'PerformTransaction') {
-        const trans = await Transaction.findOne({ transactionId: params.id })
+        const trans = await Transaction.findOne({ transactionId: params.id, provider: 'PAYME' })
         if (!trans) {
           return res.json({ error: { code: -31003, message: { uz: 'Tranzaksiya topilmadi' } }, id })
+        }
+        if (trans.paymentStatus === 'PAID') {
+          return res.json({
+            result: {
+              perform_time: trans.paidAt?.getTime() || Date.now(),
+              transaction: trans._id.toString(),
+              state: 2,
+            },
+            id,
+          })
+        }
+        if (trans.paymentStatus !== 'PENDING') {
+          return res.json({
+            error: { code: -31008, message: { uz: 'Buyurtma muddati tugagan' } },
+            id,
+          })
         }
         trans.paymentStatus = 'PAID'
         trans.paidAt = new Date()
@@ -495,8 +665,8 @@ export const PaymentsController = {
       }
 
       return res.json({ error: { code: -32601, message: 'Method not found' }, id })
-    } catch (err) {
-      return res.json({ error: { code: -32400, message: err.message }, id })
+    } catch {
+      return res.json({ error: { code: -32400, message: { uz: 'Ichki server xatosi' } }, id })
     }
   },
 

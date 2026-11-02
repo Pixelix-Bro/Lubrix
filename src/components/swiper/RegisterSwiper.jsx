@@ -1,61 +1,47 @@
-import { CheckCircle2, ShieldAlert, Sparkles, TrendingUp } from 'lucide-react';
-import { useSelector } from 'react-redux';
+import { useSelector } from 'react-redux'
 
 export default function RegisterSwiper() {
-  const theme = useSelector((state) => state.themes.theme);
+  const theme = useSelector((state) => state.themes.theme)
 
   return (
-    <div className="w-[50%] hidden lg:flex h-screen relative overflow-hidden bg-black select-none">
-      {/* Background High Definition Video */}
+    <div className="relative flex hidden h-screen w-1/2 select-none overflow-hidden bg-black lg:block">
       <video
         autoPlay
         loop
         muted
         playsInline
         poster="/start/backgroundWebp.webp"
-        className="absolute inset-0 w-full h-full object-cover opacity-60 scale-105"
+        className="absolute inset-0 h-full w-full scale-105 object-cover opacity-75"
       >
         <source src="/video/checkout.mp4" type="video/mp4" />
       </video>
 
-      {/* Atmospheric overlays */}
       <div
-        className={`absolute inset-0 bg-gradient-to-t ${
-          theme ? 'from-surface via-surface/60 to-transparent' : 'from-black/80 via-black/40 to-black/20'
+        className={`absolute inset-y-0 -left-[5px] z-10 w-32 sm:w-48 lg:w-64 transition-colors duration-300 ${
+          theme
+            ? 'bg-gradient-to-r to-transparent via-[#090d16]/75 from-[#090d16]'
+            : 'bg-gradient-to-r to-transparent via-[#f7fbf8]/75 from-[#f7fbf8]'
         }`}
       />
       <div
-        className={`absolute inset-0 bg-gradient-to-l ${
-          theme ? 'from-transparent via-transparent to-surface' : 'from-transparent via-transparent to-white'
-        }`}
+        className="pointer-events-none absolute inset-y-0 left-0 z-[11]  transition-colors duration-300 w-[65%] opacity-60"
+        style={{
+          backgroundImage: theme
+            ? 'radial-gradient(rgba(68, 190, 143, 0.18) 1px, transparent 1px)'
+            : 'radial-gradient(rgba(19, 164, 119, 0.2) 1px, transparent 1px)',
+          backgroundSize: '22px 22px',
+          maskImage: 'linear-gradient(90deg, transparent, black 45%, transparent)',
+        }}
+        aria-hidden="true"
       />
-
-      {/* Informative text side */}
-      <div className="relative z-20 flex flex-col justify-end p-12 text-white max-w-lg space-y-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 text-xs font-semibold backdrop-blur-md w-fit">
-          <Sparkles size={14} />
-          <span>SaaS Enterprise Obuna</span>
-        </div>
-
-        <h2 className="text-3xl xl:text-4xl font-bold font-[title] leading-tight text-white drop-shadow-md">
-          Mijozlar Bazasi va Tushumlar To‘liq Nazorat Ostida
-        </h2>
-
-        <p className="text-sm text-gray-300 leading-relaxed drop-shadow">
-          Hisobingizni ro‘yxatdan o‘tkazing, kerakli tarifni tanlang va servisingiz ish unumdorligini 40% ga oshiring.
-        </p>
-
-        <div className="space-y-2 pt-2 text-xs font-medium text-gray-200">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-            <span>Xavfsiz Uzcard, Humo, Click, Payme to‘lov integratsiyasi</span>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <TrendingUp size={16} className="text-blue-400 shrink-0" />
-            <span>12 oylik chuqurlashtirilgan analitika va real tushum hisoboti</span>
-          </div>
-        </div>
-      </div>
+      <div
+        className={`absolute  transition-colors duration-300 inset-x-0 bottom-0 z-10 h-[55%] ${
+          theme
+            ? 'bg-gradient-to-t from-[#090d16] via-[#090d16]/85 to-transparent'
+            : 'bg-gradient-to-t from-[#f7fbf8] via-[#f7fbf8]/85 to-transparent'
+        }`}
+        aria-hidden="true"
+      />
     </div>
-  );
+  )
 }

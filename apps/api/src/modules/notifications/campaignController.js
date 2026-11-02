@@ -6,7 +6,7 @@ import {
   SmsCampaign,
   SmsTemplate,
 } from '../../models/index.js'
-import { getSmsProvider } from './smsAdapter.js'
+import { getSmsProvider, MockSmsAdapter } from './smsAdapter.js'
 
 function fillTemplate(message, customer) {
   return String(message || '')
@@ -17,12 +17,17 @@ function fillTemplate(message, customer) {
 async function recipientsForSegment(organizationId, segment) {
   const customers = await Customer.find({
     organizationId,
-    optedOutAt: { $exists: false },
+    optedOutAt: { $in: [null] },
     customerType: { $ne: 'WALK_IN' },
     phoneE164: { $exists: true, $ne: '' },
   })
 
-  if (segment === 'ALL') return customers
+  if (segment === 'NO_CONSENT') return customers.filter((customer) => !customer.smsConsentAt)
+
+  const consentedCustomers = customers.filter(
+    (customer) => customer.smsConsentAt && customer.smsConsentSource
+  )
+  if (segment === 'ALL') return consentedCustomers
 
   const now = new Date()
   const services = await ServiceRecord.find({ organizationId }).sort({ serviceDate: -1 })
@@ -35,7 +40,7 @@ async function recipientsForSegment(organizationId, segment) {
 
   if (segment === 'DUE_SOON') {
     const in14 = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
-    return customers.filter((c) => {
+    return consentedCustomers.filter((c) => {
       const last = lastByCustomer.get(c._id.toString())
       if (!last?.nextDueDate) return false
       const due = new Date(last.nextDueDate)
@@ -45,7 +50,7 @@ async function recipientsForSegment(organizationId, segment) {
 
   if (segment === 'OVERDUE_90') {
     const ago90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-    return customers.filter((c) => {
+    return consentedCustomers.filter((c) => {
       const last = lastByCustomer.get(c._id.toString())
       if (!last) return true
       return new Date(last.serviceDate) < ago90
@@ -58,14 +63,10 @@ async function recipientsForSegment(organizationId, segment) {
       if (!s.customerId) continue
       counts[s.customerId] = (counts[s.customerId] || 0) + 1
     }
-    return customers.filter((c) => (counts[c._id.toString()] || 0) >= 3)
+    return consentedCustomers.filter((c) => (counts[c._id.toString()] || 0) >= 3)
   }
 
-  if (segment === 'NO_CONSENT') {
-    return customers.filter((c) => !c.smsConsentAt)
-  }
-
-  return customers
+  return consentedCustomers
 }
 
 export const CampaignController = {
@@ -106,6 +107,11 @@ export const CampaignController = {
       if (!message || !String(message).trim()) {
         return res.status(400).json({ success: false, error: 'SMS matni kiritilishi shart' })
       }
+      if (segment === 'NO_CONSENT') {
+        return res
+          .status(400)
+          .json({ success: false, error: 'Rozilik bermagan mijozlarga SMS yuborib bo‘lmaydi.' })
+      }
 
       const recipients = await recipientsForSegment(req.organizationId, segment)
       const campaign = await SmsCampaign.create({
@@ -124,6 +130,7 @@ export const CampaignController = {
       }
 
       const provider = getSmsProvider()
+      const testMode = provider instanceof MockSmsAdapter
       let sent = 0
       let failed = 0
       for (const customer of recipients) {
@@ -140,7 +147,7 @@ export const CampaignController = {
           channel: 'SMS',
           provider: process.env.SMS_PROVIDER || 'mock',
           providerMessageId: result.providerMessageId,
-          status: result.success ? 'sent' : 'failed',
+          status: testMode ? 'test' : result.success ? 'sent' : 'failed',
           cost: result.cost || 0,
           sentAt: new Date(),
         })
@@ -148,12 +155,12 @@ export const CampaignController = {
         else failed += 1
       }
 
-      campaign.status = failed && !sent ? 'FAILED' : 'SENT'
+      campaign.status = testMode ? 'TESTED' : failed && !sent ? 'FAILED' : 'SENT'
       campaign.sentCount = sent
       campaign.failedCount = failed
       await campaign.save()
 
-      res.json({ success: true, data: campaign })
+      res.json({ success: true, data: campaign, testMode })
     } catch (err) {
       next(err)
     }
@@ -207,7 +214,10 @@ export const CampaignController = {
 
   async listInbox(req, res, next) {
     try {
-      const notes = await InAppNotification.find({ organizationId: req.organizationId })
+      const notes = await InAppNotification.find({
+        organizationId: req.organizationId,
+        dismissedAt: { $exists: false },
+      })
         .sort({ createdAt: -1 })
         .limit(50)
       res.json({ success: true, data: notes })
@@ -222,6 +232,34 @@ export const CampaignController = {
         { organizationId: req.organizationId, readAt: { $exists: false } },
         { $set: { readAt: new Date() } }
       )
+      res.json({ success: true })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  async markInboxItemRead(req, res, next) {
+    try {
+      const notification = await InAppNotification.findOneAndUpdate(
+        { _id: req.params.id, organizationId: req.organizationId, dismissedAt: { $exists: false } },
+        { $set: { readAt: new Date() } },
+        { new: true }
+      )
+      if (!notification) return res.status(404).json({ success: false, error: 'Xabar topilmadi' })
+      res.json({ success: true, data: notification })
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  async dismissInboxItem(req, res, next) {
+    try {
+      const notification = await InAppNotification.findOneAndUpdate(
+        { _id: req.params.id, organizationId: req.organizationId },
+        { $set: { dismissedAt: new Date() } },
+        { new: true }
+      )
+      if (!notification) return res.status(404).json({ success: false, error: 'Xabar topilmadi' })
       res.json({ success: true })
     } catch (err) {
       next(err)

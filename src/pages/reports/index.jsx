@@ -1,46 +1,29 @@
-import { BarChart3, ChevronDown, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { BarChart3, ChevronDown, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { useSelector } from 'react-redux'
 
-import { lubrixApi } from '../../services/api';
+import { useGetReportsDashboardQuery } from '../../Redux/apiCache'
 
-import ReportsStatsGrid from './ReportsStatsGrid';
-import RevenueAreaChart from './RevenueAreaChart';
-import OilBrandPieChart from './OilBrandPieChart';
-import TransactionsTable from './TransactionsTable';
+import OilBrandPieChart from './OilBrandPieChart'
+import ReportsStatsGrid from './ReportsStatsGrid'
+import RevenueAreaChart from './RevenueAreaChart'
+import TransactionsTable from './TransactionsTable'
 
 export default function Reports() {
-  const theme = useSelector((s) => s.themes.theme);
+  const theme = useSelector((s) => s.themes.theme)
 
-  const [loading,   setLoading  ] = useState(true);
-  const [data,      setData     ] = useState(null);
-  const [reminders, setReminders] = useState([]);
-  const [year,      setYear     ] = useState(new Date().getFullYear());
-
-  const load = async (y = year) => {
-    try {
-      setLoading(true);
-      const [rRes, remRes] = await Promise.all([
-        lubrixApi.getReports({ year: y }),
-        lubrixApi.getReminders(),
-      ]);
-      setData(rRes.data?.data     || null);
-      setReminders(remRes.data?.data || []);
-    } catch (err) {
-      console.error('[Reports] load error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const [year, setYear] = useState(new Date().getFullYear())
+  const { data: reportsData, isLoading: loading } = useGetReportsDashboardQuery(year, {
+    refetchOnMountOrArgChange: 60,
+  })
+  const data = reportsData?.report || null
+  const reminders = reportsData?.reminders || []
 
   const handleYearChange = (y) => {
-    setYear(y);
-    load(y);
-  };
+    setYear(y)
+  }
 
-  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
+  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
 
   return (
     <div className="space-y-6">
@@ -68,10 +51,15 @@ export default function Reports() {
             }`}
           >
             {years.map((y) => (
-              <option key={y} value={y}>{y}-yil</option>
+              <option key={y} value={y}>
+                {y}-yil
+              </option>
             ))}
           </select>
-          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+          <ChevronDown
+            size={14}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
+          />
         </div>
       </div>
 
@@ -122,12 +110,17 @@ export default function Reports() {
           >
             <div className="mb-4">
               <h2 className="text-base font-bold font-[title]">So'nggi Tranzaksiyalar Ro'yxati</h2>
-              <p className="text-xs text-gray-400">Bajarilgan xizmatlar va ulardan olingan tushum</p>
+              <p className="text-xs text-gray-400">
+                Bajarilgan xizmatlar va ulardan olingan tushum
+              </p>
             </div>
-            <TransactionsTable services={data?.recentServices || []} />
+            <TransactionsTable
+              services={data?.recentServices || []}
+              transactions={data?.recentTransactions || []}
+            />
           </div>
         </>
       )}
     </div>
-  );
+  )
 }

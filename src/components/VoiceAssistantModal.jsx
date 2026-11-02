@@ -6,7 +6,7 @@ import {
   Loader2,
   Mic,
   MicOff,
-  Sparkles,
+  Search,
   User,
   X,
 } from 'lucide-react'
@@ -21,7 +21,10 @@ export default function VoiceAssistantModal({ isOpen, onClose }) {
   const navigate = useNavigate()
 
   const [activeLang, setActiveLang] = useState('uz-UZ')
+  const [mode, setMode] = useState('crm')
   const [speechText, setSpeechText] = useState('')
+  const [assistantAnswer, setAssistantAnswer] = useState('')
+  const [assistantError, setAssistantError] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [results, setResults] = useState({
     customers: [],
@@ -34,24 +37,42 @@ export default function VoiceAssistantModal({ isOpen, onClose }) {
     await performVoiceQuery(finalText)
   }
 
-  const { isListening, transcript, error, startListening, stopListening, toggleListening } =
-    useVoiceSearch({
-      onResult: handleVoiceResult,
-      lang: activeLang,
-    })
+  const {
+    isListening,
+    isSupported,
+    transcript,
+    error,
+    startListening,
+    stopListening,
+    toggleListening,
+  } = useVoiceSearch({
+    onResult: handleVoiceResult,
+    lang: activeLang,
+  })
 
   useEffect(() => {
-    if (isOpen) {
-      startListening(activeLang)
-    } else {
-      stopListening()
-    }
-  }, [isOpen, activeLang, startListening, stopListening])
+    if (!isOpen) stopListening()
+  }, [isOpen, stopListening])
 
   // Command & Query analyzer
   const performVoiceQuery = async (query) => {
     if (!query || query.trim().length < 2) return
     const q = query.toLowerCase().trim()
+
+    if (mode === 'help') {
+      try {
+        setIsSearching(true)
+        setAssistantError('')
+        setAssistantAnswer('')
+        const response = await lubrixApi.askAssistant(query.trim())
+        setAssistantAnswer(response.data?.data?.answer || '')
+      } catch (requestError) {
+        setAssistantError(requestError.response?.data?.error || 'AI yordam javob bera olmadi.')
+      } finally {
+        setIsSearching(false)
+      }
+      return
+    }
 
     // 1. Check for quick vocal navigation commands
     if (q.includes('ombor') || q.includes('mahsulot') || q.includes('sklad')) {
@@ -84,13 +105,26 @@ export default function VoiceAssistantModal({ isOpen, onClose }) {
         lubrixApi.getVehicles({ search: query }),
       ])
 
-      setResults({
+      const nextResults = {
         customers: custRes.data?.data || [],
         products: prodRes.data?.data || [],
         vehicles: vehRes.data?.data || [],
-      })
+      }
+      setResults(nextResults)
+      if (
+        !nextResults.customers.length &&
+        !nextResults.products.length &&
+        !nextResults.vehicles.length
+      ) {
+        setAssistantError(
+          'CRM’da mos yozuv topilmadi. Ism, telefon yoki davlat raqamini qayta ayting.'
+        )
+      } else {
+        setAssistantError('')
+      }
     } catch (err) {
       console.error('Voice search error:', err)
+      setAssistantError(err.response?.data?.error || 'CRM qidiruvida xatolik yuz berdi.')
     } finally {
       setIsSearching(false)
     }
@@ -127,6 +161,37 @@ export default function VoiceAssistantModal({ isOpen, onClose }) {
                 Mikrofon orqali mahsulot, mijoz yoki avtomobil qidirish
               </p>
             </div>
+          </div>
+
+          <div
+            className="mt-4 inline-flex rounded-lg border border-inherit p-1"
+            role="group"
+            aria-label="Ovozli yordam turi"
+          >
+            <button
+              type="button"
+              aria-pressed={mode === 'crm'}
+              onClick={() => {
+                setMode('crm')
+                setAssistantAnswer('')
+                setAssistantError('')
+              }}
+              className={`min-h-9 rounded-md px-3 text-xs font-semibold ${mode === 'crm' ? 'bg-primary text-white' : 'text-gray-400'}`}
+            >
+              CRM qidirish
+            </button>
+            <button
+              type="button"
+              aria-pressed={mode === 'help'}
+              onClick={() => {
+                setMode('help')
+                setAssistantAnswer('')
+                setAssistantError('')
+              }}
+              className={`min-h-9 rounded-md px-3 text-xs font-semibold ${mode === 'help' ? 'bg-primary text-white' : 'text-gray-400'}`}
+            >
+              AI yordam
+            </button>
           </div>
 
           {/* Language Selector */}
@@ -183,7 +248,7 @@ export default function VoiceAssistantModal({ isOpen, onClose }) {
             )}
           </p>
 
-          <p className="text-xs text-gray-400 italic max-w-md min-h-[20px]">
+          <p className="text-xs text-gray-400 italic max-w-md min-h-5">
             "
             {transcript ||
               speechText ||
@@ -191,10 +256,53 @@ export default function VoiceAssistantModal({ isOpen, onClose }) {
             "
           </p>
 
-          {error && (
+          {mode === 'help' && (
+            <p className="mt-2 max-w-lg text-[11px] leading-5 text-gray-500">
+              AI yordam javob berish uchun faqat aytilgan savol matnini server orqali AI
+              provayderiga yuboradi; CRM’dagi mijoz yozuvlariga kira olmaydi.
+            </p>
+          )}
+
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              void performVoiceQuery(speechText)
+            }}
+            className="mt-4 flex w-full max-w-lg items-center gap-2"
+          >
+            <label htmlFor="assistant-query" className="sr-only">
+              CRM yoki AI uchun savol
+            </label>
+            <input
+              id="assistant-query"
+              value={speechText}
+              onChange={(event) => setSpeechText(event.target.value)}
+              placeholder={
+                mode === 'crm'
+                  ? 'Mijoz, telefon, raqam yoki mahsulot...'
+                  : 'Lubrix haqida savolingiz...'
+              }
+              className={`min-h-10 min-w-0 flex-1 rounded-lg border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary ${theme ? 'border-white/10 bg-white/5 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+            />
+            <button
+              type="submit"
+              disabled={isSearching || speechText.trim().length < 2}
+              aria-label="Qidirish yoki savol berish"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary text-white disabled:opacity-50"
+            >
+              <Search size={16} />
+            </button>
+          </form>
+
+          {!isSupported && (
+            <p className="mt-2 text-xs text-amber-600">
+              Bu brauzer ovoz tanishni qo‘llamaydi. Matn orqali qidirishingiz mumkin.
+            </p>
+          )}
+          {(error || assistantError) && (
             <div className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
               <AlertCircle size={14} />
-              <span>{error}</span>
+              <span>{error || assistantError}</span>
             </div>
           )}
         </div>
@@ -206,6 +314,15 @@ export default function VoiceAssistantModal({ isOpen, onClose }) {
               <Loader2 size={18} className="animate-spin text-primary mr-2" />
               <span>Qidirilmoqda...</span>
             </div>
+          ) : mode === 'help' ? (
+            assistantAnswer ? (
+              <div
+                role="status"
+                className={`whitespace-pre-wrap rounded-xl border p-4 text-sm leading-6 ${theme ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}
+              >
+                {assistantAnswer}
+              </div>
+            ) : null
           ) : (
             <>
               {/* Products Section */}
@@ -252,13 +369,14 @@ export default function VoiceAssistantModal({ isOpen, onClose }) {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {results.customers.map((c) => (
-                      <div
+                      <button
+                        type="button"
                         key={c._id || c.id}
                         onClick={() => {
                           onClose()
-                          navigate(`/customers?search=${encodeURIComponent(c.fullName)}`)
+                          navigate(`/customers/${c._id || c.id}`)
                         }}
-                        className={`p-3 rounded-xl border text-xs cursor-pointer transition flex items-center justify-between ${
+                        className={`w-full p-3 rounded-xl border text-left text-xs cursor-pointer transition flex items-center justify-between ${
                           theme
                             ? 'border-white/5 bg-white/5 hover:border-purple-500/50'
                             : 'border-gray-200 bg-gray-50 hover:border-purple-500/50'
@@ -271,7 +389,7 @@ export default function VoiceAssistantModal({ isOpen, onClose }) {
                           </p>
                         </div>
                         <ArrowRight size={14} className="text-gray-400" />
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>

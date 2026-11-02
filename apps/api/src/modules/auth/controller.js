@@ -1,135 +1,72 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { User, Organization } from '../../models/index.js';
-import { JWT_SECRET } from '../../middleware/auth.js';
+import bcrypt from 'bcryptjs'
+import { AuthSession, Organization, User } from '../../models/index.js'
+import { disconnectSession } from '../../realtime/socket.js'
+import {
+  clearAuthCookies,
+  cookiePolicy,
+  createCsrfToken,
+  hashSecret,
+  isValidCsrfToken,
+  readCookie,
+  setAuthCookies,
+} from '../../utils/authCookies.js'
+import { issueAuthSession, revokeRefreshSession, rotateRefreshSession } from './authSession.js'
 
-const createSlug = (name) => {
-  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-  return `${base || 'lubrix'}-${Math.random().toString(36).substring(2, 7)}`;
-};
-
-export const register = async (req, res, next) => {
-  try {
-    const { name, email, password, organizationName, phone } = req.body;
-
-    if (!name || !email || !password || !organizationName) {
-      return res.status(400).json({
-        success: false,
-        error: 'Ism, email, parol va tashkilot nomi talab qilinadi'
-      });
-    }
-
-    const cleanEmail = email.toLowerCase().trim();
-    const existingUser = await User.findOne({ email: cleanEmail });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        error: 'Ushbu email bilan ro‘yxatdan o‘tilgan'
-      });
-    }
-
-    const slug = createSlug(organizationName);
-    const org = await Organization.create({
-      name: organizationName.trim(),
-      slug,
-      countryCode: 'UZ',
-      currency: 'UZS',
-      timezone: 'Asia/Tashkent',
-      defaultLocale: 'uz',
-      status: 'active'
-    });
-
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    const user = await User.create({
-      name: name.trim(),
-      email: cleanEmail,
-      passwordHash,
-      organizationId: org._id.toString(),
-      role: 'OWNER',
-      phone: phone || '',
-      isActive: true,
-      lastLogin: new Date()
-    });
-
-    const payload = {
-      userId: user._id.toString(),
-      organizationId: org._id.toString(),
-      role: user.role,
-      name: user.name
-    };
-
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
-
-    res.status(201).json({
-      success: true,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        organizationId: user.organizationId,
-        phone: user.phone
-      },
-      organization: {
-        id: org._id,
-        name: org.name,
-        slug: org.slug,
-        currency: org.currency,
-        settings: org.settings
-      }
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+export const register = async (req, res) => {
+  return res.status(403).json({
+    success: false,
+    error: 'Akkaunt faqat to‘lov provayderi tasdiqlagan checkout orqali yaratiladi.',
+  })
+}
 
 export const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const csrfCookie = readCookie(req, 'lubrix_csrf')
+    if (!isValidCsrfToken(csrfCookie, req.headers['x-csrf-token'], hashSecret(csrfCookie || ''))) {
+      return res.status(403).json({ success: false, error: 'CSRF tekshiruvi o‘tmadi' })
+    }
+    const { email, password } = req.body
 
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        error: 'Email va parol kiritilishi shart'
-      });
+        error: 'Email va parol kiritilishi shart',
+      })
     }
 
-    const cleanEmail = email.toLowerCase().trim();
-    const user = await User.findOne({ email: cleanEmail });
+    const cleanEmail = email.toLowerCase().trim()
+    const user = await User.findOne({ email: cleanEmail })
     if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
-        error: 'Noto‘g‘ri login yoki parol'
-      });
+        error: 'Noto‘g‘ri login yoki parol',
+      })
     }
 
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    const isMatch = await bcrypt.compare(password, user.passwordHash)
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        error: 'Noto‘g‘ri login yoki parol'
-      });
+        error: 'Noto‘g‘ri login yoki parol',
+      })
     }
 
-    user.lastLogin = new Date();
-    await user.save();
+    const org = await Organization.findById(user.organizationId)
+    if (!org) {
+      return res.status(409).json({
+        success: false,
+        error: 'Foydalanuvchining tashkilot ma’lumoti topilmadi. Administrator bilan bog‘laning.',
+      })
+    }
 
-    const org = await Organization.findById(user.organizationId);
+    user.lastLogin = new Date()
+    await user.save()
 
-    const payload = {
-      userId: user._id.toString(),
-      organizationId: user.organizationId,
-      role: user.role,
-      name: user.name
-    };
-
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+    const session = await issueAuthSession(res, user, req)
 
     res.json({
       success: true,
-      token,
+      csrfToken: session.csrfToken,
       user: {
         id: user._id,
         name: user.name,
@@ -137,170 +74,159 @@ export const login = async (req, res, next) => {
         role: user.role,
         organizationId: user.organizationId,
         branchId: user.branchId,
-        phone: user.phone
+        phone: user.phone,
       },
-      organization: org ? {
+      organization: {
         id: org._id,
         name: org.name,
         slug: org.slug,
         currency: org.currency,
-        settings: org.settings
-      } : null
-    });
+        settings: org.settings,
+      },
+    })
   } catch (err) {
-    next(err);
+    next(err)
   }
-};
+}
+
+export const refresh = async (req, res, next) => {
+  try {
+    const result = await rotateRefreshSession(readCookie(req, 'lubrix_refresh'), req)
+    if (result?.csrfInvalid) {
+      return res.status(403).json({ success: false, error: 'CSRF tekshiruvi o‘tmadi' })
+    }
+    if (!result || !result.user) {
+      clearAuthCookies(res)
+      return res.status(401).json({ success: false, error: 'Sessiya tugagan. Qayta kiring.' })
+    }
+    setAuthCookies(res, result)
+    res.json({
+      success: true,
+      csrfToken: result.csrfToken,
+      user: {
+        id: result.user._id,
+        name: result.user.name,
+        email: result.user.email,
+        role: result.user.role,
+        organizationId: result.user.organizationId,
+        branchId: result.user.branchId,
+        phone: result.user.phone,
+        avatarUrl: result.user.avatarUrl,
+      },
+    })
+  } catch (err) {
+    next(err)
+  }
+}
 
 export const logout = async (req, res, next) => {
   try {
+    const refreshToken = readCookie(req, 'lubrix_refresh')
+    const result = await revokeRefreshSession(refreshToken, req)
+    if (result.csrfInvalid) {
+      return res.status(403).json({ success: false, error: 'CSRF tekshiruvi o‘tmadi' })
+    }
+    for (const sessionId of result.sessionIds) disconnectSession(sessionId)
+    clearAuthCookies(res)
     res.json({
       success: true,
-      message: 'Muvaffaqiyatli tizimdan chiqildi'
-    });
+      revoked: result.revoked,
+      message: 'Muvaffaqiyatli tizimdan chiqildi',
+    })
   } catch (err) {
-    next(err);
+    next(err)
   }
-};
+}
+
+export const getCsrfToken = (req, res) => {
+  let csrfToken = readCookie(req, 'lubrix_csrf')
+  if (!csrfToken) {
+    csrfToken = createCsrfToken()
+    res.cookie('lubrix_csrf', csrfToken, {
+      ...cookiePolicy(),
+      httpOnly: false,
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    })
+  }
+  return res.json({ success: true, csrfToken })
+}
 
 export const me = async (req, res, next) => {
   try {
-    const user = await User.findById(req.userId);
+    const user = await User.findOne({ _id: req.userId, organizationId: req.organizationId })
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: 'Foydalanuvchi topilmadi'
-      });
+        error: 'Foydalanuvchi topilmadi',
+      })
     }
 
-    const safeUser = user.toObject ? user.toObject() : { ...user };
-    delete safeUser.passwordHash;
+    const safeUser = user.toObject ? user.toObject() : { ...user }
+    delete safeUser.passwordHash
 
-    const org = await Organization.findById(req.organizationId);
+    const org = await Organization.findById(req.organizationId)
 
     res.json({
       success: true,
       data: {
         user: safeUser,
-        organization: org
-      }
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const checkoutRegister = async (req, res, next) => {
-  try {
-    const {
-      name,
-      ownerName,
-      email,
-      organizationName,
-      businessName,
-      phone,
-      planName = 'Starter',
-      password
-    } = req.body;
-
-    const orgName = (organizationName || businessName || '').trim();
-    const clientName = (name || ownerName || 'Servis Egasi').trim();
-
-    if (!email || !orgName) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email va tashkilot nomi talab qilinadi'
-      });
-    }
-
-    const cleanEmail = email.toLowerCase().trim();
-    let existingUser = await User.findOne({ email: cleanEmail });
-    if (existingUser) {
-      // User already exists, log them in and update plan
-      await Organization.findByIdAndUpdate(existingUser.organizationId, {
-        subscriptionPlan: planName.toUpperCase(),
-        subscriptionStatus: 'ACTIVE',
-        subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      });
-
-      const payload = {
-        userId: existingUser._id.toString(),
-        organizationId: existingUser.organizationId,
-        role: existingUser.role,
-        name: existingUser.name
-      };
-      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
-
-      return res.json({
-        success: true,
-        message: 'Mavjud hisobga yangi tarif muvaffaqiyatli ulandi!',
-        token,
-        user: {
-          id: existingUser._id,
-          name: existingUser.name,
-          email: existingUser.email,
-          role: existingUser.role,
-          organizationId: existingUser.organizationId
-        }
-      });
-    }
-
-    // New Registration via Checkout
-    const autoPassword = password || `Lubrix${Math.floor(100000 + Math.random() * 900000)}!`;
-    const passwordHash = await bcrypt.hash(autoPassword, 12);
-    const slug = createSlug(orgName);
-
-    const org = await Organization.create({
-      name: orgName,
-      slug,
-      countryCode: 'UZ',
-      currency: 'UZS',
-      timezone: 'Asia/Tashkent',
-      defaultLocale: 'uz',
-      status: 'active',
-      subscriptionPlan: planName.toUpperCase(),
-      subscriptionStatus: 'ACTIVE',
-      subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-    });
-
-    const user = await User.create({
-      name: clientName,
-      email: cleanEmail,
-      passwordHash,
-      organizationId: org._id.toString(),
-      role: 'OWNER',
-      phone: phone || '',
-      isActive: true,
-      lastLogin: new Date()
-    });
-
-    const payload = {
-      userId: user._id.toString(),
-      organizationId: org._id.toString(),
-      role: user.role,
-      name: user.name
-    };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
-
-    res.status(201).json({
-      success: true,
-      message: `To‘lov qabul qilindi! Parol ${cleanEmail} elektron pochtasiga yuborildi.`,
-      generatedPassword: autoPassword,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        organizationId: user.organizationId
+        organization: org,
       },
-      organization: {
-        id: org._id,
-        name: org.name,
-        subscriptionPlan: org.subscriptionPlan
-      }
-    });
+      csrfToken: readCookie(req, 'lubrix_csrf'),
+    })
   } catch (err) {
-    next(err);
+    next(err)
   }
-};
+}
+
+export const listSessions = async (req, res, next) => {
+  try {
+    const sessions = await AuthSession.find({
+      userId: req.userId,
+      organizationId: req.organizationId,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    })
+      .select('_id createdAt lastUsedAt userAgent ipAddress expiresAt')
+      .sort({ lastUsedAt: -1 })
+      .limit(50)
+      .lean()
+    res.json({
+      success: true,
+      data: sessions.map((session) => ({
+        ...session,
+        isCurrent: String(session._id) === String(req.authSession._id),
+      })),
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const revokeSession = async (req, res, next) => {
+  try {
+    const session = await AuthSession.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userId: req.userId,
+        organizationId: req.organizationId,
+        revokedAt: null,
+      },
+      { $set: { revokedAt: new Date() } },
+      { returnDocument: 'after' }
+    )
+    if (!session) return res.status(404).json({ success: false, error: 'Sessiya topilmadi' })
+    disconnectSession(session._id.toString())
+    res.json({ success: true, data: { revoked: true } })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const checkoutRegister = async (req, res) => {
+  return res.status(503).json({
+    success: false,
+    error: 'To‘lov provayderi sozlanmagan. To‘lov tasdiqlanmaguncha akkaunt yaratilmaydi.',
+  })
+}

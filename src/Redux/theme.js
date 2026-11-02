@@ -1,37 +1,68 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit'
 
-const getInitialTheme = () => {
+const getInitialMode = () => {
   try {
-    const saved = localStorage.getItem('lubrix-theme');
-    if (saved !== null) {
-      return JSON.parse(saved);
-    }
+    const savedMode = localStorage.getItem('lubrix-theme-mode')
+    if (['system', 'light', 'dark'].includes(savedMode)) return savedMode
+    const legacy = localStorage.getItem('lubrix-theme')
+    if (legacy !== null) return JSON.parse(legacy) ? 'dark' : 'light'
   } catch {
     // ignore
   }
-  return false;
-};
+  return 'system'
+}
+
+const getSystemTheme = () => {
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  } catch {
+    return false
+  }
+}
+
+const getInitialTheme = (mode) => mode === 'dark' || (mode === 'system' && getSystemTheme())
+
+const persistTheme = (mode, theme) => {
+  try {
+    localStorage.setItem('lubrix-theme-mode', mode)
+    localStorage.setItem('lubrix-theme', JSON.stringify(theme))
+  } catch {
+    // ignore storage issues
+  }
+}
+
+const initialMode = getInitialMode()
 
 const themeSlice = createSlice({
   name: 'theme',
   initialState: {
-    theme: getInitialTheme(),
+    mode: initialMode,
+    theme: getInitialTheme(initialMode),
   },
   reducers: {
     activ: (state, action) => {
       if (typeof action.payload === 'boolean') {
-        state.theme = action.payload;
+        state.theme = action.payload
       } else {
-        state.theme = !state.theme;
+        state.theme = !state.theme
       }
-      try {
-        localStorage.setItem('lubrix-theme', JSON.stringify(state.theme));
-      } catch {
-        // ignore storage issues
+      state.mode = state.theme ? 'dark' : 'light'
+      persistTheme(state.mode, state.theme)
+    },
+    setThemeMode: (state, action) => {
+      if (!['system', 'light', 'dark'].includes(action.payload)) return
+      state.mode = action.payload
+      if (action.payload !== 'system') state.theme = action.payload === 'dark'
+      persistTheme(state.mode, state.theme)
+    },
+    resolveSystemTheme: (state, action) => {
+      if (state.mode === 'system') {
+        state.theme = Boolean(action.payload)
+        persistTheme(state.mode, state.theme)
       }
     },
   },
-});
+})
 
-export const { activ } = themeSlice.actions;
-export default themeSlice.reducer;
+export const { activ, setThemeMode, resolveSystemTheme } = themeSlice.actions
+export default themeSlice.reducer

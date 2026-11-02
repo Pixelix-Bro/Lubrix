@@ -1,34 +1,15 @@
-import {
-  AlertTriangle,
-  ArrowRight,
-  BookOpen,
-  Car,
-  Check,
-  CheckCircle2,
-  ChevronRight,
-  Droplet,
-  ExternalLink,
-  Filter,
-  Gauge,
-  HelpCircle,
-  Info,
-  Layers,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  Wrench,
-} from 'lucide-react';
-import React, { useState } from 'react';
-import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { ArrowRight, Car, ChevronRight, Droplet, Info, Search, Wrench } from 'lucide-react'
+import { useState } from 'react'
+import { useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
 
 export default function OilSelector() {
-  const theme = useSelector((state) => state.themes.theme);
-  const navigate = useNavigate();
+  const theme = useSelector((state) => state.themes.theme)
+  const navigate = useNavigate()
 
-  const [selectedMake, setSelectedMake] = useState('Chevrolet');
-  const [search, setSearch] = useState('');
-  const [selectedCar, setSelectedCar] = useState(null);
+  const [selectedMake, setSelectedMake] = useState('Chevrolet')
+  const [search, setSearch] = useState('')
+  const [selectedCar, setSelectedCar] = useState(null)
 
   // Uzbek Automotive Fleet Oil Recommendations Database
   const carDatabase = [
@@ -76,7 +57,8 @@ export default function OilSelector() {
       intervalKm: 6000,
       intervalDays: 90,
       filterType: 'Maxsus kassetali filtr',
-      notes: 'Moy ichidagi tishli kamar (Wet Timing Belt) tufayli faqat Dexos 1 Gen 3 quyilishi SHART!',
+      notes:
+        'Moy ichidagi tishli kamar (Wet Timing Belt) tufayli faqat Dexos 1 Gen 3 quyilishi SHART!',
     },
     {
       id: 'ch-malibu2',
@@ -106,7 +88,8 @@ export default function OilSelector() {
       intervalKm: 6500,
       intervalDays: 90,
       filterType: 'Original GM',
-      notes: 'Dvigatel moyi kamar bilan to‘g‘ridan-to‘g‘ri aloqada. Noto‘g‘ri moy kamarni yemirishi mumkin!',
+      notes:
+        'Dvigatel moyi kamar bilan to‘g‘ridan-to‘g‘ri aloqada. Noto‘g‘ri moy kamarni yemirishi mumkin!',
     },
     {
       id: 'ch-damas',
@@ -170,7 +153,8 @@ export default function OilSelector() {
       intervalKm: 7500,
       intervalDays: 180,
       filterType: 'BYD Original OEM',
-      notes: 'Gibrid dvigatel tez-tez sovuq start olgani sababli 0W-20 kam viskoziteli toza sintetika zarur.',
+      notes:
+        'Gibrid dvigatel tez-tez sovuq start olgani sababli 0W-20 kam viskoziteli toza sintetika zarur.',
     },
     {
       id: 'byd-chazor',
@@ -221,19 +205,19 @@ export default function OilSelector() {
       filterType: '04152-YZZA1',
       notes: 'Dynamic Force motorlari o‘ta past viskoziteli 0W-16 / 0W-20 moylarga mo‘ljallangan.',
     },
-  ];
+  ]
 
-  const makes = ['Chevrolet', 'Kia', 'BYD', 'Hyundai', 'Toyota'];
+  const makes = ['Chevrolet', 'Kia', 'BYD', 'Hyundai', 'Toyota']
 
   const filteredCars = carDatabase.filter((c) => {
-    const matchesMake = selectedMake === 'ALL' || c.make === selectedMake;
-    const q = search.toLowerCase();
+    const matchesMake = selectedMake === 'ALL' || c.make === selectedMake
+    const q = search.toLowerCase()
     const matchesSearch =
       c.model.toLowerCase().includes(q) ||
       c.engine.toLowerCase().includes(q) ||
-      c.viscosity.toLowerCase().includes(q);
-    return matchesMake && matchesSearch;
-  });
+      c.viscosity.toLowerCase().includes(q)
+    return matchesMake && matchesSearch
+  })
 
   return (
     <div className="space-y-6">
@@ -298,7 +282,7 @@ export default function OilSelector() {
         <div className="lg:col-span-7 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {filteredCars.map((car) => {
-              const isSelected = selectedCar?.id === car.id;
+              const isSelected = selectedCar?.id === car.id
               return (
                 <div
                   key={car.id}
@@ -307,8 +291,8 @@ export default function OilSelector() {
                     isSelected
                       ? 'border-primary bg-primary/10 shadow-lg'
                       : theme
-                      ? 'border-white/10 bg-surface hover:border-white/30'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
+                        ? 'border-white/10 bg-surface hover:border-white/30'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
                   }`}
                 >
                   <div>
@@ -333,7 +317,7 @@ export default function OilSelector() {
                     </span>
                   </div>
                 </div>
-              );
+              )
             })}
           </div>
         </div>
@@ -351,7 +335,9 @@ export default function OilSelector() {
                   ZAVOD TAVSIYANOMASI
                 </span>
                 <h2 className="text-lg font-bold font-[title] mt-1">{selectedCar.model}</h2>
-                <p className="text-xs text-gray-400">{selectedCar.yearRange} · {selectedCar.engine}</p>
+                <p className="text-xs text-gray-400">
+                  {selectedCar.yearRange} · {selectedCar.engine}
+                </p>
               </div>
 
               {/* Specs Grid */}
@@ -361,7 +347,9 @@ export default function OilSelector() {
                     theme ? 'border-white/5 bg-white/5' : 'border-gray-100 bg-gray-50'
                   }`}
                 >
-                  <p className="text-[10px] text-gray-400 font-[title] uppercase">Asosiy Viskozitet</p>
+                  <p className="text-[10px] text-gray-400 font-[title] uppercase">
+                    Asosiy Viskozitet
+                  </p>
                   <p className="text-base font-bold text-amber-400 font-mono mt-1">
                     {selectedCar.viscosity}
                   </p>
@@ -372,7 +360,9 @@ export default function OilSelector() {
                     theme ? 'border-white/5 bg-white/5' : 'border-gray-100 bg-gray-50'
                   }`}
                 >
-                  <p className="text-[10px] text-gray-400 font-[title] uppercase">Moy Hajmi (Litr)</p>
+                  <p className="text-[10px] text-gray-400 font-[title] uppercase">
+                    Moy Hajmi (Litr)
+                  </p>
                   <p className="text-base font-bold text-emerald-400 font-mono mt-1">
                     {selectedCar.capacityLiters} Litr
                   </p>
@@ -383,7 +373,9 @@ export default function OilSelector() {
                     theme ? 'border-white/5 bg-white/5' : 'border-gray-100 bg-gray-50'
                   }`}
                 >
-                  <p className="text-[10px] text-gray-400 font-[title] uppercase">Zavod Standarti</p>
+                  <p className="text-[10px] text-gray-400 font-[title] uppercase">
+                    Zavod Standarti
+                  </p>
                   <p className="font-semibold text-xs text-primary font-mono mt-1">
                     {selectedCar.standard}
                   </p>
@@ -410,7 +402,9 @@ export default function OilSelector() {
                 </div>
                 <div className="flex items-center justify-between py-1.5">
                   <span className="text-gray-400">Muqobil viskozitet:</span>
-                  <span className="font-mono text-gray-300">{selectedCar.alternativeViscosity}</span>
+                  <span className="font-mono text-gray-300">
+                    {selectedCar.alternativeViscosity}
+                  </span>
                 </div>
               </div>
 
@@ -419,7 +413,7 @@ export default function OilSelector() {
                 onClick={() => {
                   navigate(
                     `/services?brand=Castrol&viscosity=${selectedCar.viscosity}&qty=${selectedCar.capacityLiters}&autoOpen=true`
-                  );
+                  )
                 }}
                 className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-primary hover:bg-blue-600 text-white font-[title] font-bold text-xs tracking-wider transition shadow-lg shadow-blue-500/25"
               >
@@ -437,12 +431,13 @@ export default function OilSelector() {
               <Car size={44} className="text-gray-500 mb-3" />
               <h3 className="text-sm font-bold font-[title]">Avtomobilni tanlang</h3>
               <p className="text-xs text-gray-400 max-w-xs mt-1">
-                Chap tomondagi ro‘yxatdan avtomobil rusumini tanlasangiz, zavod talabi va moy hajmi ko‘rsatiladi.
+                Chap tomondagi ro‘yxatdan avtomobil rusumini tanlasangiz, zavod talabi va moy hajmi
+                ko‘rsatiladi.
               </p>
             </div>
           )}
         </div>
       </div>
     </div>
-  );
+  )
 }

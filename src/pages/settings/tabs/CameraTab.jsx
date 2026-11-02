@@ -1,30 +1,34 @@
-import { Camera, CheckCircle2, Loader2, Save, Video } from 'lucide-react';
-import { useSelector } from 'react-redux';
+import { Camera, Loader2, Save } from 'lucide-react'
+import { useSelector } from 'react-redux'
 
 /**
  * CameraTab — ANPR Avtomatik Raqam Tanuvchi Kamera Sozlamalari
  */
 export default function CameraTab({ cameraSettings, setCameraSettings, onSave, saving }) {
-  const theme = useSelector((s) => s.themes.theme);
+  const theme = useSelector((s) => s.themes.theme)
 
   const inputCls = `w-full px-3 py-2.5 rounded-xl border text-sm outline-none transition ${
     theme
       ? 'border-white/10 bg-white/5 text-white placeholder:text-gray-500 focus:border-primary/50'
       : 'border-gray-200 bg-white text-gray-900 focus:border-primary/50'
-  }`;
+  }`
 
-  const labelCls = `block text-xs font-semibold mb-1 ${theme ? 'text-gray-300' : 'text-gray-600'}`;
+  const labelCls = `block text-xs font-semibold mb-1 ${theme ? 'text-gray-300' : 'text-gray-600'}`
 
   return (
     <div className="space-y-6">
-      <div className={`p-5 rounded-2xl border ${theme ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-white shadow-sm'}`}>
+      <div
+        className={`p-5 rounded-2xl border ${theme ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-white shadow-sm'}`}
+      >
         <div className="flex items-center gap-2.5 mb-4">
           <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
             <Camera size={22} />
           </div>
           <div>
             <h3 className="text-base font-bold font-[title]">Yo‘lak Kirish Kamerasi (ANPR)</h3>
-            <p className="text-xs text-gray-400">Avtomobil servis yo‘lagiga kirganda davlat raqamini avtomatik aniqlash</p>
+            <p className="text-xs text-gray-400">
+              Avtomobil servis yo‘lagiga kirganda davlat raqamini avtomatik aniqlash
+            </p>
           </div>
         </div>
 
@@ -57,10 +61,14 @@ export default function CameraTab({ cameraSettings, setCameraSettings, onSave, s
               <label className={labelCls}>Raqam Aniqlanganda Amal</label>
               <select
                 value={cameraSettings.actionOnDetect || 'OPEN_SERVICE'}
-                onChange={(e) => setCameraSettings((p) => ({ ...p, actionOnDetect: e.target.value }))}
+                onChange={(e) =>
+                  setCameraSettings((p) => ({ ...p, actionOnDetect: e.target.value }))
+                }
                 className={inputCls}
               >
-                <option value="OPEN_SERVICE">To‘g‘ridan-to‘g‘ri Yangi Xizmat Oynasini Ochish</option>
+                <option value="OPEN_SERVICE">
+                  To‘g‘ridan-to‘g‘ri Yangi Xizmat Oynasini Ochish
+                </option>
                 <option value="NOTIFY_MASTER">Ustaga Bildirishnoma Yuborish</option>
                 <option value="RECORD_ONLY">Faqat Jurnalga Yozish (Log)</option>
               </select>
@@ -72,7 +80,9 @@ export default function CameraTab({ cameraSettings, setCameraSettings, onSave, s
                 min="50"
                 max="99"
                 value={cameraSettings.minConfidence || 85}
-                onChange={(e) => setCameraSettings((p) => ({ ...p, minConfidence: Number(e.target.value) }))}
+                onChange={(e) =>
+                  setCameraSettings((p) => ({ ...p, minConfidence: Number(e.target.value) }))
+                }
                 className={inputCls}
               />
             </div>
@@ -116,5 +126,5 @@ export default function CameraTab({ cameraSettings, setCameraSettings, onSave, s
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -1,61 +1,49 @@
-import { Sparkles, ShieldCheck, Zap } from 'lucide-react';
-import { useSelector } from 'react-redux';
+import { useSelector } from 'react-redux'
 
 export default function LoginSwiper() {
-  const theme = useSelector((state) => state.themes.theme);
+  const theme = useSelector((state) => state.themes.theme)
 
   return (
-    <div className="w-[50%] hidden lg:flex h-screen relative overflow-hidden bg-black select-none">
-      {/* Background High Definition Video */}
+    <div className="relative hidden h-screen w-1/2 select-none overflow-hidden bg-black lg:block">
       <video
         autoPlay
         loop
         muted
         playsInline
-        poster="/start/backgroundWebp.webp"
-        className="absolute inset-0 w-full h-full object-cover opacity-65 scale-105"
+        poster="/loginPhoto/LoginPhoto.jpg"
+        className="absolute inset-0 h-full w-full object-cover"
+        aria-hidden="true"
       >
-        <source src="/video/background.mp4" type="video/mp4" />
+        <source src="/video/login.mp4" type="video/mp4" />
+        <source src="/video/login.mp4" type="video/mp4" />
       </video>
-
-      {/* Cinematic dark/light overlay gradient */}
       <div
-        className={`absolute inset-0 bg-gradient-to-t ${
-          theme ? 'from-surface via-surface/60 to-transparent' : 'from-black/80 via-black/40 to-black/20'
+        className={`absolute inset-y-0 right-0 w-32 sm:w-48 lg:w-64 ${
+          theme
+            ? 'bg-gradient-to-r from-transparent via-[#0f172a]/75 to-[#0f172a]'
+            : 'bg-gradient-to-r from-transparent via-[#f7fbf8]/75 to-[#f7fbf8]'
         }`}
+        aria-hidden="true"
       />
       <div
-        className={`absolute inset-0 bg-gradient-to-r ${
-          theme ? 'from-transparent via-transparent to-surface' : 'from-transparent via-transparent to-white'
+        className={`absolute inset-x-0 bottom-0 z-10 h-[55%] ${
+          theme
+            ? 'bg-gradient-to-t from-[#0f172a] via-[#0f172a]/85 to-transparent'
+            : 'bg-linear-to-t from-[#f7fbf8] via-[#f7fbf8]/85 to-transparent'
         }`}
+        aria-hidden="true"
       />
-
-      {/* Captivating Brand Text Overlay */}
-      <div className="relative z-20 flex flex-col justify-end p-12 text-white max-w-lg space-y-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-400 text-xs font-semibold backdrop-blur-md w-fit">
-          <Sparkles size={14} />
-          <span>Professional CRM Platform</span>
-        </div>
-
-        <h2 className="text-3xl xl:text-4xl font-bold font-[title] leading-tight text-white drop-shadow-md">
-          Avtoservisingizni Yangi Bosqichga Olib Chiqing
-        </h2>
-
-        <p className="text-sm text-gray-300 leading-relaxed drop-shadow">
-          Moy almashtirish shoxobchalari, do‘konlar va xizmat ko‘rsatish markazlari uchun yagona avtomatlashtirilgan aqlli tizim.
-        </p>
-
-        <div className="grid grid-cols-2 gap-3 pt-2 text-xs font-medium text-gray-200">
-          <div className="flex items-center gap-2">
-            <Zap size={16} className="text-amber-400 shrink-0" />
-            <span>Tezkor ANPR Kamera & POS</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <ShieldCheck size={16} className="text-emerald-400 shrink-0" />
-            <span>Avtomatik SMS & Telegram Bot</span>
-          </div>
-        </div>
-      </div>
+      <div
+        className="pointer-events-none absolute inset-y-0 right- z-10 w-[65%] h-[300px] opacity-60"
+        style={{
+          backgroundImage: theme
+            ? 'radial-gradient(rgba(68, 190, 143, 0.18) 1px, transparent 1px)'
+            : 'radial-gradient(rgba(19, 164, 119, 0.2) 1px, transparent 1px)',
+          backgroundSize: '22px 22px',
+          maskImage: 'linear-gradient(90deg, transparent, black 45%, transparent)',
+        }}
+        aria-hidden="true"
+      />
     </div>
-  );
+  )
 }

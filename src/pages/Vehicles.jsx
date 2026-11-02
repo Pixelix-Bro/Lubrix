@@ -1,77 +1,71 @@
-import {
-  AlertCircle,
-  Calendar,
-  Car,
-  ChevronRight,
-  Gauge,
-  History,
-  Loader2,
-  Plus,
-  Search,
-  User,
-  Wrench,
-  X,
-} from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
-import { lubrixApi } from '../services/api';
-import { lubrixSocket } from '../services/socket';
+import { AlertCircle, Car, Gauge, Loader2, Plus, Search, User, Wrench, X } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
+import { Link, useSearchParams } from 'react-router-dom'
+import { lubrixApi } from '../services/api'
+import { lubrixSocket } from '../services/socket'
+import { fileToImageDataUrl } from '../utils/imageDataUrl'
 
 export default function Vehicles() {
-  const theme = useSelector((state) => state.themes.theme);
-  const [vehicles, setVehicles] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const theme = useSelector((state) => state.themes.theme)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const search = searchParams.get('search') || ''
+  const vehicleIdFilter = searchParams.get('vehicleId') || ''
+  const [vehicles, setVehicles] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   // Form State
-  const [customerId, setCustomerId] = useState('');
-  const [plateNumber, setPlateNumber] = useState('');
-  const [make, setMake] = useState('');
-  const [model, setModel] = useState('');
-  const [modelYear, setModelYear] = useState('');
-  const [vin, setVin] = useState('');
-  const [currentOdometerKm, setCurrentOdometerKm] = useState('');
+  const [customerId, setCustomerId] = useState('')
+  const [plateNumber, setPlateNumber] = useState('')
+  const [make, setMake] = useState('')
+  const [model, setModel] = useState('')
+  const [modelYear, setModelYear] = useState('')
+  const [vin, setVin] = useState('')
+  const [imageUrl, setImageUrl] = useState('')
+  const [currentOdometerKm, setCurrentOdometerKm] = useState('')
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
-      setLoading(true);
+      setLoading(true)
       const [vehRes, custRes] = await Promise.all([
         lubrixApi.getVehicles({ search }),
         lubrixApi.getCustomers(),
-      ]);
-      setVehicles(vehRes.data.data || []);
-      setCustomers(custRes.data.data || []);
+      ])
+      setVehicles(vehRes.data.data || [])
+      setCustomers(custRes.data.data || [])
     } catch (err) {
-      console.error('Error fetching vehicles:', err);
+      console.error('Error fetching vehicles:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }, [search])
 
   useEffect(() => {
-    loadData();
+    const timer = window.setTimeout(() => void loadData(), 0)
 
     const unsub = lubrixSocket.subscribe('vehicle:created', (newVeh) => {
-      setVehicles((prev) => [newVeh, ...prev]);
-    });
-    return () => unsub();
-  }, [search]);
+      setVehicles((prev) => [newVeh, ...prev])
+    })
+    return () => {
+      window.clearTimeout(timer)
+      unsub()
+    }
+  }, [loadData])
 
   const handleCreateVehicle = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
     if (!customerId || !plateNumber) {
-      setError('Mijoz va davlat raqamini kiritish shart!');
-      return;
+      setError('Mijoz va davlat raqamini kiritish shart!')
+      return
     }
 
     try {
-      setSubmitting(true);
-      setError('');
+      setSubmitting(true)
+      setError('')
       await lubrixApi.createVehicle({
         customerId,
         plateNumber,
@@ -79,46 +73,49 @@ export default function Vehicles() {
         model,
         modelYear: modelYear ? Number(modelYear) : undefined,
         vin,
+        imageUrl,
         currentOdometerKm: currentOdometerKm ? Number(currentOdometerKm) : 0,
-      });
+      })
 
-      setIsModalOpen(false);
-      resetForm();
-      loadData();
+      setIsModalOpen(false)
+      resetForm()
+      loadData()
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Xatolik yuz berdi');
+      setError(err.response?.data?.error || err.message || 'Xatolik yuz berdi')
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  };
+  }
 
   const resetForm = () => {
-    setCustomerId('');
-    setPlateNumber('');
-    setMake('');
-    setModel('');
-    setModelYear('');
-    setVin('');
-    setCurrentOdometerKm('');
-    setError('');
-  };
+    setCustomerId('')
+    setPlateNumber('')
+    setMake('')
+    setModel('')
+    setModelYear('')
+    setVin('')
+    setImageUrl('')
+    setCurrentOdometerKm('')
+    setError('')
+  }
 
   // Helper to find customer name
   const getCustomerName = (cust) => {
-    if (typeof cust === 'object' && cust?.fullName) return cust.fullName;
-    const found = customers.find((c) => c._id === cust || c.id === cust);
-    return found ? found.fullName : 'Biriktirilmagan';
-  };
+    if (typeof cust === 'object' && cust?.fullName) return cust.fullName
+    const found = customers.find((c) => c._id === cust || c.id === cust)
+    return found ? found.fullName : 'Biriktirilmagan'
+  }
 
   const filteredVehicles = vehicles.filter((v) => {
-    const q = search.toLowerCase();
+    if (vehicleIdFilter && String(v._id || v.id) !== vehicleIdFilter) return false
+    const q = search.toLowerCase()
     return (
       (v.plateNumber && v.plateNumber.toLowerCase().includes(q)) ||
       (v.make && v.make.toLowerCase().includes(q)) ||
       (v.model && v.model.toLowerCase().includes(q)) ||
       (v.vin && v.vin.toLowerCase().includes(q))
-    );
-  });
+    )
+  })
 
   return (
     <div className="space-y-6">
@@ -136,8 +133,8 @@ export default function Vehicles() {
 
         <button
           onClick={() => {
-            resetForm();
-            setIsModalOpen(true);
+            resetForm()
+            setIsModalOpen(true)
           }}
           className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-blue-600 text-white font-medium text-sm transition shadow-lg shadow-blue-500/20 shrink-0"
         >
@@ -157,7 +154,12 @@ export default function Vehicles() {
           <input
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => {
+              const nextParams = new URLSearchParams(searchParams)
+              if (event.target.value) nextParams.set('search', event.target.value)
+              else nextParams.delete('search')
+              setSearchParams(nextParams, { replace: true })
+            }}
             placeholder="Davlat raqami, marka, model yoki VIN kodi bo‘yicha qidirish..."
             className="w-full bg-transparent outline-none text-sm placeholder:text-gray-500"
           />
@@ -169,9 +171,7 @@ export default function Vehicles() {
           }`}
         >
           <span className="text-xs sm:text-sm text-gray-400">Jami Avtomobillar:</span>
-          <span className="font-[title] font-bold text-lg text-primary">
-            {vehicles.length} ta
-          </span>
+          <span className="font-[title] font-bold text-lg text-primary">{vehicles.length} ta</span>
         </div>
       </div>
 
@@ -219,13 +219,11 @@ export default function Vehicles() {
                 }`}
               >
                 {filteredVehicles.map((v) => {
-                  const custName = getCustomerName(v.customerId);
+                  const custName = getCustomerName(v.customerId)
                   return (
                     <tr
                       key={v._id || v.id}
-                      className={`transition ${
-                        theme ? 'hover:bg-white/5' : 'hover:bg-gray-50/80'
-                      }`}
+                      className={`transition ${theme ? 'hover:bg-white/5' : 'hover:bg-gray-50/80'}`}
                     >
                       <td className="px-5 py-4">
                         <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 font-mono font-bold tracking-wider text-xs sm:text-sm">
@@ -235,7 +233,9 @@ export default function Vehicles() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <div className="font-semibold">{v.make || 'Noma‘lum'} {v.model || ''}</div>
+                        <div className="font-semibold">
+                          {v.make || 'Noma‘lum'} {v.model || ''}
+                        </div>
                         {v.modelYear && (
                           <div className="text-xs text-gray-400">{v.modelYear}-yil</div>
                         )}
@@ -255,9 +255,7 @@ export default function Vehicles() {
                         </div>
                       </td>
 
-                      <td className="px-5 py-4 text-xs text-gray-400 font-mono">
-                        {v.vin || '—'}
-                      </td>
+                      <td className="px-5 py-4 text-xs text-gray-400 font-mono">{v.vin || '—'}</td>
 
                       <td className="px-5 py-4 text-right">
                         <Link
@@ -269,7 +267,7 @@ export default function Vehicles() {
                         </Link>
                       </td>
                     </tr>
-                  );
+                  )
                 })}
               </tbody>
             </table>
@@ -282,7 +280,9 @@ export default function Vehicles() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div
             className={`w-full max-w-lg rounded-2xl border p-6 shadow-2xl relative transition-all ${
-              theme ? 'border-white/10 bg-surface text-white' : 'border-gray-200 bg-white text-gray-900'
+              theme
+                ? 'border-white/10 bg-surface text-white'
+                : 'border-gray-200 bg-white text-gray-900'
             }`}
           >
             <button
@@ -442,6 +442,33 @@ export default function Vehicles() {
                 </div>
               </div>
 
+              <div className="flex items-center gap-3">
+                {imageUrl && (
+                  <img
+                    src={imageUrl}
+                    alt="Avtomobil rasmi ko‘rinishi"
+                    className="h-14 w-20 rounded-md object-cover"
+                  />
+                )}
+                <label className="grid gap-1 text-xs text-gray-400">
+                  Avtomobil rasmi (ixtiyoriy)
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0]
+                      if (!file) return
+                      try {
+                        setImageUrl(await fileToImageDataUrl(file))
+                      } catch (imageError) {
+                        setError(imageError.message)
+                      }
+                    }}
+                    className="max-w-full text-xs"
+                  />
+                </label>
+              </div>
+
               <div className="pt-2 flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -474,5 +501,5 @@ export default function Vehicles() {
         </div>
       )}
     </div>
-  );
+  )
 }

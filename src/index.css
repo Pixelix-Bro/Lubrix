@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 @font-face {
   font-family: 'brand';
   src: url('./fonts/Orbitron/Orbitron-VariableFont_wght.ttf') format('woff2');
@@ -20,15 +22,94 @@
   --color-border: #1e293b;
 }
 
+@theme inline {
+  --color-auth-text: var(--auth-text);
+  --color-auth-muted: var(--auth-muted);
+  --color-auth-subtle: var(--auth-subtle);
+}
+
+:root {
+  --auth-bg: #080c14;
+  --auth-bg-raised: #0b1220;
+  --auth-surface: #0f172a;
+  --auth-surface-raised: #151f32;
+  --auth-accent: #2563eb;
+  --auth-accent-hover: #3478f6;
+  --auth-text: #f8fafc;
+  --auth-muted: #94a3b8;
+  --auth-subtle: #64748b;
+  --auth-border: rgba(148, 163, 184, 0.16);
+  --auth-danger: #ef4444;
+  --auth-success: #22c55e;
+  --auth-radius-sm: 6px;
+  --auth-radius-md: 10px;
+  --auth-radius-lg: 14px;
+  --auth-radius-card: 18px;
+  --auth-focus: 0 0 0 3px rgba(37, 99, 235, 0.24);
+  --auth-accent: #16a77a;
+  --auth-accent-hover: #20bd8c;
+  --auth-accent-soft: rgba(22, 167, 122, 0.14);
+  --auth-dot: rgba(148, 163, 184, 0.16);
+  --auth-input: rgba(18, 28, 39, 0.78);
+  --auth-panel: #080d13;
+}
+
+:root[data-theme='light'] {
+  --auth-bg: #ffffff;
+  --auth-bg-raised: #f8fafc;
+  --auth-surface: #ffffff;
+  --auth-surface-raised: #f2f6f7;
+  --auth-accent: #079b70;
+  --auth-accent-hover: #07865f;
+  --auth-text: #172033;
+  --auth-muted: #667085;
+  --auth-subtle: #98a2b3;
+  --auth-border: #dce2e8;
+  --auth-danger: #dc4545;
+  --auth-success: #16a36f;
+  --auth-focus: 0 0 0 3px rgba(7, 155, 112, 0.16);
+  --auth-accent-soft: rgba(7, 155, 112, 0.08);
+  --auth-dot: rgba(25, 117, 91, 0.13);
+  --auth-input: #ffffff;
+  --auth-panel: #ffffff;
+}
+
+:root[data-theme='dark'] {
+  --auth-bg: #080d13;
+  --auth-bg-raised: #0d141d;
+  --auth-surface: #121c27;
+  --auth-surface-raised: #172331;
+  --auth-accent: #16a77a;
+  --auth-accent-hover: #20bd8c;
+  --auth-text: #f1f5f9;
+  --auth-muted: #a1adba;
+  --auth-subtle: #718096;
+  --auth-border: rgba(148, 163, 184, 0.16);
+  --auth-danger: #ef4444;
+  --auth-success: #22c55e;
+  --auth-focus: 0 0 0 3px rgba(22, 167, 122, 0.22);
+  --auth-accent-soft: rgba(22, 167, 122, 0.14);
+  --auth-dot: rgba(148, 163, 184, 0.14);
+  --auth-input: rgba(18, 28, 39, 0.78);
+  --auth-panel: #0d141d;
+}
+
 body {
-  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-.font-title, [class*="font-[title]"] {
-  font-family: "Outfit", "Plus Jakarta Sans", sans-serif;
+.font-title,
+[class*='font-[title]'] {
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
 }
 
 .font-brand {
@@ -38,23 +119,5 @@ body {
 
 /* Professional clean scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.2);
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.4);
-}
-
-button {
-  cursor: pointer;
+  display: none;
 }

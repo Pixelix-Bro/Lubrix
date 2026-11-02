@@ -1,14 +1,13 @@
-import React from 'react';
-import { useRouteError, useNavigate } from 'react-router-dom';
-import { AlertTriangle, RefreshCw, Home, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, Home, RefreshCw } from 'lucide-react'
+import { useNavigate, useRouteError } from 'react-router-dom'
 
 export default function RouteErrorBoundary() {
-  const error = useRouteError();
-  const navigate = useNavigate();
+  const error = useRouteError()
+  const navigate = useNavigate()
 
-  console.error('[Lubrix Route Error]', error);
+  console.error('[Lubrix Route Error]', error)
 
-  const errorMessage = error?.statusText || error?.message || 'Kutilmagan xatolik yuz berdi';
+  const errorMessage = error?.statusText || error?.message || 'Kutilmagan xatolik yuz berdi'
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans">
@@ -18,7 +17,9 @@ export default function RouteErrorBoundary() {
             <AlertTriangle size={26} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white tracking-tight">Kutilmagan Xatolik Yuz Berdi</h2>
+            <h2 className="text-xl font-bold text-white tracking-tight">
+              Kutilmagan Xatolik Yuz Berdi
+            </h2>
             <p className="text-xs text-slate-400">Lubrix tizimi operatsiyani yakunlay olmadi</p>
           </div>
         </div>
@@ -47,7 +48,9 @@ export default function RouteErrorBoundary() {
 
         {error?.stack && (
           <details className="mt-6 text-[11px] text-slate-500 border-t border-white/5 pt-4">
-            <summary className="cursor-pointer hover:text-slate-400">Texnik ma’lumotlar (Developer)</summary>
+            <summary className="cursor-pointer hover:text-slate-400">
+              Texnik ma’lumotlar (Developer)
+            </summary>
             <pre className="mt-2 max-h-40 overflow-auto rounded bg-black/40 p-2 font-mono text-[10px] text-slate-400 whitespace-pre-wrap">
               {error.stack}
             </pre>
@@ -55,5 +58,5 @@ export default function RouteErrorBoundary() {
         )}
       </div>
     </div>
-  );
+  )
 }

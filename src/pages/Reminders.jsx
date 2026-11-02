@@ -1,87 +1,87 @@
 import {
-  AlertCircle,
   Bell,
-  Calendar,
   Check,
   CheckCircle2,
   Clock,
-  Filter,
-  History,
   Loader2,
   MessageSquare,
-  Phone,
   Search,
   Send,
   ShieldCheck,
   Smartphone,
   XCircle,
-} from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
-import { lubrixApi } from '../services/api';
-import { lubrixSocket } from '../services/socket';
+} from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
+import { lubrixApi } from '../services/api'
+import { lubrixSocket } from '../services/socket'
 
 export default function Reminders() {
-  const theme = useSelector((state) => state.themes.theme);
-  const [reminders, setReminders] = useState([]);
-  const [logs, setLogs] = useState([]);
-  const [tab, setTab] = useState('reminders'); // 'reminders' | 'logs'
-  const [loading, setLoading] = useState(true);
-  const [sendingId, setSendingId] = useState(null);
-  const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('ALL');
+  const theme = useSelector((state) => state.themes.theme)
+  const [reminders, setReminders] = useState([])
+  const [logs, setLogs] = useState([])
+  const [tab, setTab] = useState('reminders') // 'reminders' | 'logs'
+  const [loading, setLoading] = useState(true)
+  const [sendingId, setSendingId] = useState(null)
+  const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState('ALL')
 
   const loadData = async () => {
     try {
-      setLoading(true);
+      setLoading(true)
       const [remRes, logsRes] = await Promise.all([
         lubrixApi.getReminders(),
         lubrixApi.getNotificationLogs(),
-      ]);
-      setReminders(remRes.data?.data || []);
-      setLogs(logsRes.data?.data || []);
+      ])
+      setReminders(remRes.data?.data || [])
+      setLogs(logsRes.data?.data || [])
     } catch (err) {
-      console.error('Error fetching reminders:', err);
+      console.error('Error fetching reminders:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    loadData();
+    const timer = window.setTimeout(() => void loadData(), 0)
 
     const unsub = lubrixSocket.subscribe('reminder:sent', (data) => {
       setReminders((prev) =>
-        prev.map((r) => ((r._id || r.id) === (data.reminder?._id || data.reminder?.id) ? data.reminder : r))
-      );
+        prev.map((r) =>
+          (r._id || r.id) === (data.reminder?._id || data.reminder?.id) ? data.reminder : r
+        )
+      )
       if (data.log) {
-        setLogs((prev) => [data.log, ...prev]);
+        setLogs((prev) => [data.log, ...prev])
       }
-    });
-    return () => unsub();
-  }, []);
+    })
+    return () => {
+      window.clearTimeout(timer)
+      unsub()
+    }
+  }, [])
 
   const handleSendSms = async (id) => {
     try {
-      setSendingId(id);
-      await lubrixApi.sendReminderSms(id);
-      await loadData();
+      setSendingId(id)
+      await lubrixApi.sendReminderSms(id)
+      await loadData()
     } catch (err) {
-      console.error('Failed to send SMS:', err);
+      console.error('Failed to send SMS:', err)
     } finally {
-      setSendingId(null);
+      setSendingId(null)
     }
-  };
+  }
 
   const filteredReminders = reminders.filter((r) => {
-    const q = search.toLowerCase();
+    const q = search.toLowerCase()
     const matchesSearch =
       (r.customerName && r.customerName.toLowerCase().includes(q)) ||
-      (r.vehicleLabel && r.vehicleLabel.toLowerCase().includes(q));
+      (r.vehicleLabel && r.vehicleLabel.toLowerCase().includes(q))
 
-    if (filterStatus === 'ALL') return matchesSearch;
-    return matchesSearch && r.status === filterStatus;
-  });
+    if (filterStatus === 'ALL') return matchesSearch
+    return matchesSearch && r.status === filterStatus
+  })
 
   return (
     <div className="space-y-6">
@@ -204,8 +204,8 @@ export default function Reminders() {
                   }`}
                 >
                   {filteredReminders.map((r) => {
-                    const isSent = r.status === 'sent';
-                    const isSending = sendingId === (r._id || r.id);
+                    const isSent = r.status === 'sent'
+                    const isSending = sendingId === (r._id || r.id)
 
                     return (
                       <tr
@@ -216,7 +216,9 @@ export default function Reminders() {
                       >
                         <td className="px-5 py-4">
                           <div className="font-semibold text-sm">{r.customerName || 'Mijoz'}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">{r.vehicleLabel || 'Avtomobil'}</div>
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            {r.vehicleLabel || 'Avtomobil'}
+                          </div>
                         </td>
 
                         <td className="px-5 py-4">
@@ -282,7 +284,7 @@ export default function Reminders() {
                           </button>
                         </td>
                       </tr>
-                    );
+                    )
                   })}
                 </tbody>
               </table>
@@ -360,5 +362,5 @@ export default function Reminders() {
         </div>
       )}
     </div>
-  );
+  )
 }

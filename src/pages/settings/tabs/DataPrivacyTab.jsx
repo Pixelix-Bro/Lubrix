@@ -1,28 +1,34 @@
-import { ShieldAlert, ShieldCheck } from 'lucide-react';
-import { useSelector } from 'react-redux';
+import { ShieldAlert } from 'lucide-react'
+import { useSelector } from 'react-redux'
 
 /**
  * DataPrivacyTab — Audit Log & Xavfsizlik Jurnali
  */
 export default function DataPrivacyTab({ auditLogs }) {
-  const theme = useSelector((s) => s.themes.theme);
+  const theme = useSelector((s) => s.themes.theme)
 
   return (
     <div className="space-y-6">
-      <div className={`p-5 rounded-2xl border ${theme ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-white shadow-sm'}`}>
+      <div
+        className={`p-5 rounded-2xl border ${theme ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-white shadow-sm'}`}
+      >
         <div className="flex items-center gap-2.5 mb-4">
           <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400">
             <ShieldAlert size={22} />
           </div>
           <div>
             <h3 className="text-base font-bold font-[title]">Xavfsizlik & Audit Jurnali</h3>
-            <p className="text-xs text-gray-400">Tizimda har bir foydalanuvchi tomonidan amalga oshirilgan harakatlar tarixi</p>
+            <p className="text-xs text-gray-400">
+              Tizimda har bir foydalanuvchi tomonidan amalga oshirilgan harakatlar tarixi
+            </p>
           </div>
         </div>
 
-        <div className="overflow-x-auto max-h-[420px]">
+        <div className="overflow-x-auto max-h-105">
           <table className="w-full text-left text-xs">
-            <thead className={`border-b sticky top-0 ${theme ? 'bg-surface border-white/10 text-gray-400' : 'bg-white border-gray-200 text-gray-600'}`}>
+            <thead
+              className={`border-b sticky top-0 ${theme ? 'bg-surface border-white/10 text-gray-400' : 'bg-white border-gray-200 text-gray-600'}`}
+            >
               <tr>
                 <th className="py-2.5 px-3">Sana</th>
                 <th className="py-2.5 px-3">Foydalanuvchi</th>
@@ -31,7 +37,9 @@ export default function DataPrivacyTab({ auditLogs }) {
                 <th className="py-2.5 px-3">Tafsilot</th>
               </tr>
             </thead>
-            <tbody className={`divide-y ${theme ? 'divide-white/5 text-gray-300' : 'divide-gray-100 text-gray-700'}`}>
+            <tbody
+              className={`divide-y ${theme ? 'divide-white/5 text-gray-300' : 'divide-gray-100 text-gray-700'}`}
+            >
               {auditLogs.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-8 text-center text-gray-400 italic">
@@ -40,7 +48,10 @@ export default function DataPrivacyTab({ auditLogs }) {
                 </tr>
               ) : (
                 auditLogs.map((log) => (
-                  <tr key={log._id || log.id} className={theme ? 'hover:bg-white/5' : 'hover:bg-gray-50'}>
+                  <tr
+                    key={log._id || log.id}
+                    className={theme ? 'hover:bg-white/5' : 'hover:bg-gray-50'}
+                  >
                     <td className="py-2.5 px-3 font-mono text-gray-400">
                       {new Date(log.createdAt).toLocaleString('uz-UZ')}
                     </td>
@@ -51,7 +62,9 @@ export default function DataPrivacyTab({ auditLogs }) {
                       </span>
                     </td>
                     <td className="py-2.5 px-3 font-mono text-gray-400">{log.entity}</td>
-                    <td className="py-2.5 px-3 text-gray-300 max-w-xs truncate">{log.details || '—'}</td>
+                    <td className="py-2.5 px-3 text-gray-300 max-w-xs truncate">
+                      {log.details || '—'}
+                    </td>
                   </tr>
                 ))
               )}
@@ -60,5 +73,5 @@ export default function DataPrivacyTab({ auditLogs }) {
         </div>
       </div>
     </div>
-  );
+  )
 }

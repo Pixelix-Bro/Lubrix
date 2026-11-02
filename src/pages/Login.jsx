@@ -1,69 +1,69 @@
-import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, Moon, Sparkles, Sun } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import logo from '../assets/media.png';
-import LoginSwiper from '../components/swiper/LoginSwiper';
-import { translations } from '../i18n/translations';
-import { loginFailure, loginStart, loginSuccess } from '../Redux/auth';
-import { activ } from '../Redux/theme';
-import { lubrixApi } from '../services/api';
+import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, Moon, Sparkles, Sun } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { Link, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
+import logo from '../assets/media.png'
+import LoginSwiper from '../components/swiper/LoginSwiper'
+import { translations } from '../i18n/translations'
+import { loginFailure, loginStart, loginSuccess } from '../Redux/auth'
+import { activ } from '../Redux/theme'
+import { lubrixApi } from '../services/api'
 
 export default function Login() {
-  const theme = useSelector((state) => state.themes.theme);
-  const locale = useSelector((state) => state.language.language);
-  const dict = translations[locale] || translations.uz;
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
+  const theme = useSelector((state) => state.themes.theme)
+  const locale = useSelector((state) => state.language.language)
+  const dict = translations[locale] || translations.uz
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    document.title = 'Lubrix | Kirish';
-  }, []);
+    document.title = 'Lubrix | Kirish'
+  }, [])
 
   const fillDemoAccount = () => {
-    setEmail('test1@gmail.com');
-    setPassword('test1');
-    toast.info('Demo akkaunt ma‘lumotlari kiritildi (test1@gmail.com / test1)');
-  };
+    setEmail('test1@gmail.com')
+    setPassword('test1')
+    toast.info('Demo akkaunt ma‘lumotlari kiritildi (test1@gmail.com / test1)')
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
     if (!email || !password) {
-      toast.error('Iltimos, elektron pochta va parolni kiriting');
-      return;
+      toast.error('Iltimos, elektron pochta va parolni kiriting')
+      return
     }
 
     try {
-      setLoading(true);
-      dispatch(loginStart());
+      setLoading(true)
+      dispatch(loginStart())
 
-      const res = await lubrixApi.login({ email, password });
-      if (res.data?.success && res.data?.token) {
+      const res = await lubrixApi.login({ email, password })
+      if (res.data?.success && res.data?.user) {
         dispatch(
           loginSuccess({
             token: res.data.token,
             user: res.data.user,
           })
-        );
-        toast.success(`Xush kelibsiz, ${res.data.user?.name || 'Foydalanuvchi'}!`);
-        navigate('/');
+        )
+        toast.success(`Xush kelibsiz, ${res.data.user?.name || 'Foydalanuvchi'}!`)
+        navigate('/')
       } else {
-        throw new Error(res.data?.error || 'Kirishda xatolik yuz berdi');
+        throw new Error(res.data?.error || 'Kirishda xatolik yuz berdi')
       }
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Elektron pochta yoki parol noto‘g‘ri';
-      toast.error(msg);
-      dispatch(loginFailure(msg));
+      const msg = err.response?.data?.error || err.message || 'Elektron pochta yoki parol noto‘g‘ri'
+      toast.error(msg)
+      dispatch(loginFailure(msg))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div
@@ -78,7 +78,9 @@ export default function Login() {
           <button
             onClick={() => dispatch(activ())}
             className={`flex cursor-pointer absolute bottom-5 right-5 z-30 items-center rounded-xl p-2.5 border transition ${
-              theme ? 'border-white/10 hover:bg-white/10 text-white' : 'border-gray-200 text-gray-700 hover:bg-gray-100'
+              theme
+                ? 'border-white/10 hover:bg-white/10 text-white'
+                : 'border-gray-200 text-gray-700 hover:bg-gray-100'
             }`}
             title={dict.ui.themeToggle}
           >
@@ -89,10 +91,10 @@ export default function Login() {
           <div className="absolute right-6 top-6 z-50 flex items-center gap-3">
             <img src={logo} alt="Lubrix Logo" className="w-9 sm:w-11" />
             <div>
-              <p className="font-brand text-lg sm:text-xl tracking-wider text-primary font-bold">LUBRIX</p>
-              <p className="text-[10px] tracking-wide text-gray-400">
-                Avtoservis Boshqaruv Tizimi
+              <p className="font-brand text-lg sm:text-xl tracking-wider text-primary font-bold">
+                LUBRIX
               </p>
+              <p className="text-[10px] tracking-wide text-gray-400">Avtoservis Boshqaruv Tizimi</p>
             </div>
           </div>
 
@@ -101,9 +103,7 @@ export default function Login() {
               <h1 className="text-2xl sm:text-3xl font-bold font-[title] tracking-tight mb-2">
                 {dict.auth.loginTitle}
               </h1>
-              <p className="text-xs sm:text-sm text-gray-400">
-                {dict.auth.loginSubtitle}
-              </p>
+              <p className="text-xs sm:text-sm text-gray-400">{dict.auth.loginSubtitle}</p>
             </div>
 
             {/* Quick Demo Account Button */}
@@ -202,5 +202,5 @@ export default function Login() {
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -8,82 +8,90 @@ import {
   Navigation,
   Phone,
   Plus,
-  Search,
   X,
-} from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
-import { lubrixApi } from '../services/api';
-import { lubrixSocket } from '../services/socket';
+} from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
+import { lubrixApi } from '../services/api'
+import { lubrixSocket } from '../services/socket'
 
 export default function Branches() {
-  const theme = useSelector((state) => state.themes.theme);
-  const [branches, setBranches] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const theme = useSelector((state) => state.themes.theme)
+  const [branches, setBranches] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   // Form State
-  const [name, setName] = useState('');
-  const [address, setAddress] = useState('');
-  const [latitude, setLatitude] = useState('');
-  const [longitude, setLongitude] = useState('');
-  const [phone, setPhone] = useState('+99871');
-  const [workingHours, setWorkingHours] = useState('08:30 - 20:30');
+  const [name, setName] = useState('')
+  const [address, setAddress] = useState('')
+  const [region, setRegion] = useState('')
+  const [district, setDistrict] = useState('')
+  const [latitude, setLatitude] = useState('')
+  const [longitude, setLongitude] = useState('')
+  const [phone, setPhone] = useState('+99871')
+  const [workingHours, setWorkingHours] = useState('08:30 - 20:30')
 
   const loadBranches = async () => {
     try {
-      setLoading(true);
-      const res = await lubrixApi.getBranches();
-      setBranches(res.data?.data || []);
+      setLoading(true)
+      const res = await lubrixApi.getBranches()
+      setBranches(res.data?.data || [])
     } catch (err) {
-      console.error('Error fetching branches:', err);
+      console.error('Error fetching branches:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    loadBranches();
+    const timer = window.setTimeout(() => void loadBranches(), 0)
 
     const unsub = lubrixSocket.subscribe('branch:created', (newBranch) => {
-      setBranches((prev) => [...prev, newBranch]);
-    });
-    return () => unsub();
-  }, []);
+      setBranches((prev) => [...prev, newBranch])
+    })
+    return () => {
+      window.clearTimeout(timer)
+      unsub()
+    }
+  }, [])
 
   const handleCreateBranch = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
     if (!name || !address) {
-      setError('Filial nomi va manzili kiritilishi shart');
-      return;
+      setError('Filial nomi va manzili kiritilishi shart')
+      return
     }
 
     try {
-      setSubmitting(true);
-      setError('');
+      setSubmitting(true)
+      setError('')
       await lubrixApi.createBranch({
         name,
         address,
+        region: region.trim() || undefined,
+        district: district.trim() || undefined,
         latitude: latitude ? Number(latitude) : undefined,
         longitude: longitude ? Number(longitude) : undefined,
         phone,
         workingHours,
-      });
+      })
 
-      setIsModalOpen(false);
-      setName('');
-      setAddress('');
-      setLatitude('');
-      setLongitude('');
-      await loadBranches();
+      setIsModalOpen(false)
+      setName('')
+      setAddress('')
+      setRegion('')
+      setDistrict('')
+      setLatitude('')
+      setLongitude('')
+      await loadBranches()
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Xatolik yuz berdi');
+      setError(err.response?.data?.error || err.message || 'Xatolik yuz berdi')
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -101,8 +109,8 @@ export default function Branches() {
 
         <button
           onClick={() => {
-            setError('');
-            setIsModalOpen(true);
+            setError('')
+            setIsModalOpen(true)
           }}
           className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-blue-600 text-white font-medium text-sm transition shadow-lg shadow-blue-500/20 shrink-0"
         >
@@ -132,7 +140,7 @@ export default function Branches() {
             const mapUrl =
               b.latitude && b.longitude
                 ? `https://maps.google.com/?q=${b.latitude},${b.longitude}`
-                : `https://maps.google.com/?q=${encodeURIComponent(b.address)}`;
+                : `https://maps.google.com/?q=${encodeURIComponent(b.address)}`
 
             return (
               <div
@@ -152,7 +160,14 @@ export default function Branches() {
                   <div className="space-y-2.5 text-xs text-gray-400">
                     <div className="flex items-start gap-2">
                       <MapPin size={15} className="text-gray-400 shrink-0 mt-0.5" />
-                      <span className="text-gray-300">{b.address}</span>
+                      <div>
+                        {(b.region || b.district) && (
+                          <p className="text-primary">
+                            {[b.region, b.district].filter(Boolean).join(' · ')}
+                          </p>
+                        )}
+                        <span className="text-gray-300">{b.address}</span>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -181,7 +196,7 @@ export default function Branches() {
                   </a>
                 </div>
               </div>
-            );
+            )
           })}
         </div>
       )}
@@ -191,7 +206,9 @@ export default function Branches() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div
             className={`w-full max-w-lg rounded-2xl border p-6 shadow-2xl relative transition-all ${
-              theme ? 'border-white/10 bg-surface text-white' : 'border-gray-200 bg-white text-gray-900'
+              theme
+                ? 'border-white/10 bg-surface text-white'
+                : 'border-gray-200 bg-white text-gray-900'
             }`}
           >
             <button
@@ -249,6 +266,31 @@ export default function Branches() {
                       : 'border-gray-200 bg-gray-50 text-gray-900'
                   }`}
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1 font-[title]">
+                    Viloyat / hudud
+                  </label>
+                  <input
+                    value={region}
+                    onChange={(e) => setRegion(e.target.value)}
+                    placeholder="Toshkent shahri"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none transition ${theme ? 'border-white/10 bg-white/5 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1 font-[title]">
+                    Tuman / shahar
+                  </label>
+                  <input
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    placeholder="Yunusobod"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none transition ${theme ? 'border-white/10 bg-white/5 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -355,5 +397,5 @@ export default function Branches() {
         </div>
       )}
     </div>
-  );
+  )
 }

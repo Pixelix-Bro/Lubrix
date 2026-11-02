@@ -1,19 +1,50 @@
-import { Save, CheckCircle2, AlertCircle, Loader2, Building2, MapPin, Clock, Wrench, MessageSquare } from 'lucide-react';
-import { useSelector } from 'react-redux';
+import {
+  AlertCircle,
+  Building2,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  MessageSquare,
+  Save,
+  Upload,
+} from 'lucide-react'
+import { useRef } from 'react'
+import { useSelector } from 'react-redux'
 
 /**
  * GeneralTab — Umumiy Sozlamalar tab
  */
-export default function GeneralTab({ orgData, setOrgData, onSave, saving, savedSuccess, errorMsg }) {
-  const theme = useSelector((s) => s.themes.theme);
+export default function GeneralTab({
+  orgData,
+  setOrgData,
+  onSave,
+  saving,
+  savedSuccess,
+  errorMsg,
+}) {
+  const theme = useSelector((s) => s.themes.theme)
+  const logoInput = useRef(null)
 
   const inputCls = `w-full px-3 py-2.5 rounded-xl border text-sm outline-none transition ${
     theme
       ? 'border-white/10 bg-white/5 text-white placeholder:text-gray-500 focus:border-primary/50'
       : 'border-gray-200 bg-white text-gray-900 focus:border-primary/50'
-  }`;
+  }`
 
-  const labelCls = `block text-xs font-semibold mb-1 ${theme ? 'text-gray-300' : 'text-gray-600'}`;
+  const labelCls = `block text-xs font-semibold mb-1 ${theme ? 'text-gray-300' : 'text-gray-600'}`
+
+  const handleLogoFile = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/') || file.size > 1024 * 1024) {
+      window.alert('Faqat rasm fayli, 1 MB gacha yuklang')
+      event.target.value = ''
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setOrgData((current) => ({ ...current, logoUrl: reader.result }))
+    reader.readAsDataURL(file)
+  }
 
   return (
     <form onSubmit={onSave} className="space-y-6">
@@ -80,6 +111,46 @@ export default function GeneralTab({ orgData, setOrgData, onSave, saving, savedS
         </div>
       </div>
 
+      <div>
+        <h3 className="text-sm font-bold font-[title] flex items-center gap-2 mb-3">
+          <Upload size={15} className="text-primary" />
+          Chek logotipi
+        </h3>
+        <div className="flex flex-wrap items-center gap-3">
+          {orgData.logoUrl && (
+            <img
+              src={orgData.logoUrl}
+              alt="Chek logotipi"
+              className="h-12 max-w-36 object-contain rounded border border-gray-500/20 bg-white p-1"
+            />
+          )}
+          <input
+            ref={logoInput}
+            type="file"
+            accept="image/*"
+            onChange={handleLogoFile}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => logoInput.current?.click()}
+            className={`px-3 py-2 rounded-lg border text-xs font-semibold ${theme ? 'border-white/10 hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'}`}
+          >
+            Logotip tanlash
+          </button>
+          {orgData.logoUrl && (
+            <button
+              type="button"
+              onClick={() => setOrgData((current) => ({ ...current, logoUrl: '' }))}
+              className="text-xs text-red-400"
+            >
+              Olib tashlash
+            </button>
+          )}
+          <span className="text-xs text-gray-400">PNG/JPG, 1 MB gacha</span>
+        </div>
+      </div>
+
       {/* Vaqt va til */}
       <div>
         <h3 className="text-sm font-bold font-[title] flex items-center gap-2 mb-4">
@@ -116,10 +187,12 @@ export default function GeneralTab({ orgData, setOrgData, onSave, saving, savedS
             <input
               type="text"
               value={orgData.settings?.workingDays || 'Dushanba - Shanba'}
-              onChange={(e) => setOrgData((p) => ({
-                ...p,
-                settings: { ...p.settings, workingDays: e.target.value }
-              }))}
+              onChange={(e) =>
+                setOrgData((p) => ({
+                  ...p,
+                  settings: { ...p.settings, workingDays: e.target.value },
+                }))
+              }
               className={inputCls}
               placeholder="Dushanba - Shanba"
             />
@@ -138,10 +211,12 @@ export default function GeneralTab({ orgData, setOrgData, onSave, saving, savedS
             <label className={labelCls}>SMS Provayder</label>
             <select
               value={orgData.settings?.smsProvider || 'eskiz'}
-              onChange={(e) => setOrgData((p) => ({
-                ...p,
-                settings: { ...p.settings, smsProvider: e.target.value }
-              }))}
+              onChange={(e) =>
+                setOrgData((p) => ({
+                  ...p,
+                  settings: { ...p.settings, smsProvider: e.target.value },
+                }))
+              }
               className={inputCls}
             >
               <option value="eskiz">Eskiz.uz</option>
@@ -155,10 +230,12 @@ export default function GeneralTab({ orgData, setOrgData, onSave, saving, savedS
             <input
               type="text"
               value={orgData.settings?.smsSender || '4546'}
-              onChange={(e) => setOrgData((p) => ({
-                ...p,
-                settings: { ...p.settings, smsSender: e.target.value }
-              }))}
+              onChange={(e) =>
+                setOrgData((p) => ({
+                  ...p,
+                  settings: { ...p.settings, smsSender: e.target.value },
+                }))
+              }
               className={inputCls}
               placeholder="4546"
             />
@@ -179,10 +256,12 @@ export default function GeneralTab({ orgData, setOrgData, onSave, saving, savedS
           </div>
           <button
             type="button"
-            onClick={() => setOrgData((p) => ({
-              ...p,
-              settings: { ...p.settings, autoReminders: !p.settings?.autoReminders }
-            }))}
+            onClick={() =>
+              setOrgData((p) => ({
+                ...p,
+                settings: { ...p.settings, autoReminders: !p.settings?.autoReminders },
+              }))
+            }
             className={`relative w-11 h-6 rounded-full transition-colors ${
               orgData.settings?.autoReminders ? 'bg-primary' : theme ? 'bg-white/20' : 'bg-gray-300'
             }`}
@@ -219,5 +298,5 @@ export default function GeneralTab({ orgData, setOrgData, onSave, saving, savedS
         {saving ? 'Saqlanmoqda...' : 'Saqlash'}
       </button>
     </form>
-  );
+  )
 }

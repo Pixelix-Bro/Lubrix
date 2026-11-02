@@ -1,11 +1,11 @@
 import {
   BarChart3,
   Bell,
-  Camera,
   Car,
   ChevronLeft,
   ClipboardCheck,
   Droplet,
+  History as HistoryIcon,
   LayoutDashboard,
   LogOut,
   MapPin,
@@ -17,30 +17,36 @@ import {
   Wrench,
   X,
   Zap,
-} from 'lucide-react';
-import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import media from '../assets/media.png';
-import { translations } from '../i18n/translations';
-import { logout } from '../Redux/auth';
-import { closeMobile, Opens } from '../Redux/Sitebar';
-import SiteBarButton from './mini/SiteBarButton';
+} from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
+import media from '../assets/media.png'
+import { translations } from '../i18n/translations'
+import { logout } from '../Redux/auth'
+import { closeMobile, Opens } from '../Redux/Sitebar'
+import { lubrixApi } from '../services/api'
+import { lubrixSocket } from '../services/socket'
+import SiteBarButton from './mini/SiteBarButton'
 
 export default function SiteBar() {
-  const isCollapsed = useSelector((state) => state.sidebar.value);
-  const isMobileOpen = useSelector((state) => state.sidebar.mobileOpen);
-  const authUser = useSelector((state) => state.auth?.user);
-  const theme = useSelector((state) => state.themes.theme);
-  const locale = useSelector((state) => state.language.language);
-  const dict = translations[locale] || translations.uz;
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
+  const isCollapsed = useSelector((state) => state.sidebar.value)
+  const isMobileOpen = useSelector((state) => state.sidebar.mobileOpen)
+  const authUser = useSelector((state) => state.auth?.user)
+  const theme = useSelector((state) => state.themes.theme)
+  const locale = useSelector((state) => state.language.language)
+  const dict = translations[locale] || translations.uz
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
 
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate('/login');
-  };
+  const handleLogout = async () => {
+    try {
+      await lubrixApi.logout()
+    } finally {
+      lubrixSocket.disconnect()
+      dispatch(logout())
+      navigate('/login')
+    }
+  }
 
   return (
     <>
@@ -69,7 +75,9 @@ export default function SiteBar() {
             onClick={() => dispatch(Opens())}
             aria-label={isCollapsed ? 'Menyuni kengaytirish' : 'Menyuni ixchamlashtirish'}
             className={`absolute -right-3 top-5 z-60 hidden items-center justify-center rounded-full border p-1 shadow-md md:flex ${
-              theme ? 'border-white/10 bg-surface text-white hover:bg-white/10' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-100'
+              theme
+                ? 'border-white/10 bg-surface text-white hover:bg-white/10'
+                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-100'
             }`}
           >
             <ChevronLeft
@@ -83,9 +91,7 @@ export default function SiteBar() {
             <img src={media} alt="Lubrix logo" className="w-8 shrink-0" />
 
             <div className={`min-w-0 flex-1 ${isCollapsed ? 'md:hidden' : ''}`}>
-              <p className="truncate font-brand text-lg font-bold tracking-wider text-primary">
-                LUBRIX
-              </p>
+              <p className="truncate font-brand text-lg font-bold tracking-wider ">LUBRIX</p>
               <p className="truncate text-[10px] tracking-wide text-gray-400 font-sans">
                 Avtoservis Boshqaruv Tizimi
               </p>
@@ -106,7 +112,7 @@ export default function SiteBar() {
             <SiteBarButton p="/" n={dict.nav.dashboard} i={<LayoutDashboard size={18} />} />
 
             {/* 2. Fast POS Checkout */}
-            <SiteBarButton p="/pos" n={dict.nav.pos} i={<Zap size={18}  />} />
+            <SiteBarButton p="/pos" n={dict.nav.pos} i={<Zap size={18} />} />
 
             {/* 3. Services */}
             <SiteBarButton p="/services" n={dict.nav.services} i={<Wrench size={18} />} />
@@ -127,13 +133,25 @@ export default function SiteBar() {
             <SiteBarButton p="/oil-selector" n={dict.nav.oilSelector} i={<Droplet size={18} />} />
 
             {/* 9. 15-Point Inspection */}
-            <SiteBarButton p="/inspection" n={dict.nav.inspection} i={<ClipboardCheck size={18} />} />
+            <SiteBarButton
+              p="/inspection"
+              n={dict.nav.inspection}
+              i={<ClipboardCheck size={18} />}
+            />
 
             {/* 10. Reports & Analytics */}
             <SiteBarButton p="/reports" n={dict.nav.reports} i={<BarChart3 size={18} />} />
 
+            {['OWNER', 'ADMIN'].includes(authUser?.role) && (
+              <SiteBarButton
+                p="/history"
+                n={dict.nav.history || 'Tarix'}
+                i={<HistoryIcon size={18} />}
+              />
+            )}
+
             {/* 11. Marketing */}
-            <SiteBarButton p="/marketing" n={dict.nav.marketing} i={<Megaphone size={18}  />} />
+            <SiteBarButton p="/marketing" n={dict.nav.marketing} i={<Megaphone size={18} />} />
 
             {/* 12. Branches */}
             <SiteBarButton p="/branches" n={dict.nav.branches} i={<MapPin size={18} />} />
@@ -169,9 +187,7 @@ export default function SiteBar() {
               <p className="truncate text-xs font-semibold leading-tight">
                 {authUser?.name || 'Administrator'}
               </p>
-              <p className="truncate text-[10px] text-gray-400">
-                {authUser?.role || 'OWNER'}
-              </p>
+              <p className="truncate text-[10px] text-gray-400">{authUser?.role || 'OWNER'}</p>
             </div>
 
             <button
@@ -187,5 +203,5 @@ export default function SiteBar() {
         </div>
       </aside>
     </>
-  );
+  )
 }

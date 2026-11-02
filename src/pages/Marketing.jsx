@@ -1,65 +1,86 @@
-import {
-  AlertCircle,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  Filter,
-  Flame,
-  History,
-  Layers,
-  Loader2,
-  Mail,
-  Megaphone,
-  MessageSquare,
-  Percent,
-  Plus,
-  Send,
-  Sparkles,
-  Target,
-  Users,
-} from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
-import { lubrixApi } from '../services/api';
+import { AlertCircle, Loader2, Megaphone, Send, Sparkles, Target } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
+import { toast } from 'sonner'
+import { lubrixApi } from '../services/api'
+
+const maskPhone = (phone = '') =>
+  phone.length > 6 ? `${phone.slice(0, 4)}••••${phone.slice(-2)}` : 'Raqam yashirilgan'
 
 export default function Marketing() {
-  const theme = useSelector((state) => state.themes.theme);
-  const [customers, setCustomers] = useState([]);
-  const [services, setServices] = useState([]);
-  const [targetSegment, setTargetSegment] = useState('DUE_SOON'); // 'DUE_SOON' | 'OVERDUE_90' | 'ALL' | 'INACTIVE'
+  const theme = useSelector((state) => state.themes.theme)
+  const [targetSegment, setTargetSegment] = useState('DUE_SOON')
   const [smsMessage, setSmsMessage] = useState(
-    'Lubrix: Hurmatli {customer_name}, servisimisda mavsumiy chegirma! Dvigatel moyini almashtiring va bepul 15 nuqtali tekshiruvdan o‘ting. Tel: +998712001122'
-  );
-  const [isSending, setIsSending] = useState(false);
-  const [sentSuccess, setSentSuccess] = useState(false);
+    'Lubrix: Hurmatli {customer_name}, avtomobilingiz uchun moy almashtirish muddati yaqinlashmoqda. Batafsil ma’lumot uchun servisimizga murojaat qiling.'
+  )
+  const [isSending, setIsSending] = useState(false)
+  const [preview, setPreview] = useState({ count: 0, sample: [] })
+  const [previewLoading, setPreviewLoading] = useState(true)
+  const [campaigns, setCampaigns] = useState([])
+  const [campaignResult, setCampaignResult] = useState(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    Promise.all([lubrixApi.getCustomers(), lubrixApi.getServices()]).then(
-      ([cRes, sRes]) => {
-        setCustomers(cRes.data?.data || []);
-        setServices(sRes.data?.data || []);
+    let active = true
+    const timer = window.setTimeout(async () => {
+      setPreviewLoading(true)
+      setError('')
+      try {
+        const [previewResponse, campaignResponse] = await Promise.all([
+          lubrixApi.previewCampaign(targetSegment),
+          lubrixApi.getCampaigns(),
+        ])
+        if (!active) return
+        setPreview(previewResponse.data?.data || { count: 0, sample: [] })
+        setCampaigns(campaignResponse.data?.data || [])
+      } catch (requestError) {
+        if (active)
+          setError(
+            requestError.response?.data?.error || 'Kampaniya ma’lumotlarini yuklab bo‘lmadi.'
+          )
+      } finally {
+        if (active) setPreviewLoading(false)
       }
-    );
-  }, []);
-
-  // Filter targeted recipients based on segment
-  const targetedRecipients = customers.filter((c) => {
-    if (targetSegment === 'ALL') return true;
-    if (targetSegment === 'OVERDUE_90') {
-      // Find last service date
-      return true;
+    }, 0)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
     }
-    return true;
-  });
+  }, [targetSegment])
 
   const handleLaunchCampaign = async () => {
-    setIsSending(true);
-    // Simulate batch dispatch through SMS Provider
-    await new Promise((r) => setTimeout(r, 1500));
-    setIsSending(false);
-    setSentSuccess(true);
-    setTimeout(() => setSentSuccess(false), 4000);
-  };
+    if (!preview.count || !smsMessage.trim()) return
+    const confirmed = window.confirm(
+      `${preview.count} nafar SMS roziligi qayd etilgan mijozga kampaniya yuborilsinmi?`
+    )
+    if (!confirmed) return
+
+    setIsSending(true)
+    setError('')
+    setCampaignResult(null)
+    try {
+      const response = await lubrixApi.launchCampaign({
+        name: `Marketing · ${new Date().toLocaleDateString('uz-UZ')}`,
+        segment: targetSegment,
+        message: smsMessage,
+      })
+      const result = response.data
+      setCampaignResult(result)
+      if (result?.data) setCampaigns((current) => [result.data, ...current])
+      if (result?.testMode) {
+        toast.info(
+          'Sinov rejimi: SMS yetkazilmadi. Provider javobi faqat test sifatida qayd etildi.'
+        )
+      } else {
+        toast.success(`Kampaniya yakunlandi: ${result?.data?.sentCount || 0} ta yuborildi.`)
+      }
+    } catch (requestError) {
+      setError(requestError.response?.data?.error || 'Kampaniyani yuborib bo‘lmadi.')
+      toast.error(requestError.response?.data?.error || 'Kampaniyani yuborib bo‘lmadi.')
+    } finally {
+      setIsSending(false)
+    }
+  }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -75,9 +96,13 @@ export default function Marketing() {
           </p>
         </div>
 
-        {sentSuccess && (
-          <span className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold animate-pulse">
-            ✓ Kampaniya {targetedRecipients.length} ta mijozga yuborildi!
+        {campaignResult && (
+          <span
+            className={`px-4 py-2 rounded-lg border text-xs font-semibold ${campaignResult.testMode ? 'border-amber-500/20 bg-amber-500/10 text-amber-500' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500'}`}
+          >
+            {campaignResult.testMode
+              ? `Sinov yakunlandi · ${campaignResult.data?.recipientCount || 0} recipient`
+              : `Yuborildi · ${campaignResult.data?.sentCount || 0} · Xato · ${campaignResult.data?.failedCount || 0}`}
           </span>
         )}
       </div>
@@ -103,14 +128,28 @@ export default function Marketing() {
               </label>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 {[
-                  { id: 'DUE_SOON', title: 'Muddati Kelganlar', desc: 'Moyi almashishi kerak bo‘lganlar' },
-                  { id: 'OVERDUE_90', title: '90+ Kun Bo‘lganlar', desc: 'Ko‘pdan beri kelmagan mijozlar' },
-                  { id: 'ALL', title: 'Barcha Mijozlar', desc: `Jami ${customers.length} nafar mijoz` },
-                  { id: 'VIP', title: 'Doimiy VIP Mijozlar', desc: '3 martadan ko‘p kelganlar' },
+                  {
+                    id: 'DUE_SOON',
+                    title: 'Muddati yaqin',
+                    desc: 'Keyingi 14 kun ichida',
+                  },
+                  {
+                    id: 'OVERDUE_90',
+                    title: '90+ kun bo‘lgan',
+                    desc: 'Uzoq vaqtdan beri kelmagan',
+                  },
+                  {
+                    id: 'ALL',
+                    title: 'Rozilik berganlar',
+                    desc: 'Barcha ruxsatli mijozlar',
+                  },
+                  { id: 'VIP', title: 'Doimiy mijozlar', desc: '3 martadan ko‘p tashrif buyurgan' },
                 ].map((seg) => (
-                  <div
+                  <button
+                    type="button"
                     key={seg.id}
                     onClick={() => setTargetSegment(seg.id)}
+                    aria-pressed={targetSegment === seg.id}
                     className={`p-3 rounded-2xl border cursor-pointer transition ${
                       targetSegment === seg.id
                         ? 'border-primary bg-primary/10 text-primary font-semibold'
@@ -119,9 +158,14 @@ export default function Marketing() {
                   >
                     <p className="font-[title] text-xs">{seg.title}</p>
                     <p className="text-[10px] text-gray-400 mt-0.5">{seg.desc}</p>
-                  </div>
+                  </button>
                 ))}
               </div>
+              <p className="mt-2 text-xs text-gray-400" aria-live="polite">
+                {previewLoading
+                  ? 'Rozilikli recipientlar tekshirilmoqda…'
+                  : `${preview.count} ta rozilikli recipient`}
+              </p>
             </div>
 
             {/* Template Message */}
@@ -143,7 +187,8 @@ export default function Marketing() {
                 }`}
               />
               <p className="text-[11px] text-gray-400 mt-1">
-                Avtomatik qo‘yiladi: <code className="text-primary font-mono">{`{customer_name}`}</code>
+                Avtomatik qo‘yiladi:{' '}
+                <code className="text-primary font-mono">{`{customer_name}`}</code>
               </p>
             </div>
 
@@ -173,10 +218,20 @@ export default function Marketing() {
               </div>
             </div>
 
+            {error && (
+              <div
+                role="alert"
+                className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400"
+              >
+                <AlertCircle size={15} />
+                {error}
+              </div>
+            )}
+
             {/* Launch Button */}
             <button
               onClick={handleLaunchCampaign}
-              disabled={isSending || !smsMessage}
+              disabled={isSending || previewLoading || !preview.count || !smsMessage.trim()}
               className="w-full flex items-center justify-center gap-2 py-4 px-6 rounded-2xl bg-primary hover:bg-blue-600 text-white font-[title] font-bold text-sm tracking-wider transition shadow-xl shadow-blue-500/25 disabled:opacity-50"
             >
               {isSending ? (
@@ -187,7 +242,7 @@ export default function Marketing() {
               ) : (
                 <>
                   <Send size={18} />
-                  <span>KAMPANIYANI BOSHLASH ({targetedRecipients.length} TA MIJOZ)</span>
+                  <span>KAMPANIYANI BOSHLASH ({preview.count} TA)</span>
                 </>
               )}
             </button>
@@ -209,32 +264,74 @@ export default function Marketing() {
             {/* Phone Mockup Screen */}
             <div className="max-w-[280px] mx-auto rounded-3xl border-4 border-gray-700 bg-black p-4 text-white shadow-2xl">
               <div className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-3" />
-              <div className="text-[10px] text-gray-400 text-center mb-4">Bugun 14:30 · 4546 (Lubrix)</div>
+              <div className="text-[10px] text-gray-400 text-center mb-4">
+                SMS namunasi · jo‘natuvchi sozlamada belgilanadi
+              </div>
 
               <div className="p-3 rounded-2xl bg-blue-600/90 text-white text-xs leading-relaxed shadow-md">
                 {smsMessage.replace('{customer_name}', 'Azizbek')}
               </div>
-              <div className="text-[9px] text-gray-500 text-right mt-1">Yetkazildi ✓✓</div>
+              <div className="text-[9px] text-gray-500 text-right mt-1">
+                Yetkazish holati providerga bog‘liq
+              </div>
             </div>
 
             {/* Target Stats */}
             <div className="pt-2 text-xs space-y-2 text-gray-400">
               <div className="flex items-center justify-between">
                 <span>Qabul qiluvchilar soni:</span>
-                <span className="font-bold text-white font-mono">{targetedRecipients.length} nafar</span>
+                <span className="font-bold text-white font-mono">
+                  {previewLoading ? '…' : `${preview.count} nafar`}
+                </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span>Taxminiy yetib borish:</span>
-                <span className="font-bold text-emerald-400 font-mono">99.4%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Kutilayotgan qaytish:</span>
-                <span className="font-bold text-primary font-mono">~35-45 mijoz</span>
-              </div>
+              {preview.sample?.length > 0 && (
+                <div className="border-t border-border pt-3">
+                  <p className="mb-2 text-[10px] uppercase text-gray-500">Namunaviy recipientlar</p>
+                  <ul className="space-y-1">
+                    {preview.sample.slice(0, 3).map((recipient) => (
+                      <li key={recipient.id} className="flex justify-between gap-2 text-xs">
+                        <span className="truncate">{recipient.fullName}</span>
+                        <span className="shrink-0 font-mono text-gray-500">
+                          {maskPhone(recipient.phoneE164)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      <section className="border-t border-border pt-5">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <History size={16} /> Kampaniya tarixi
+        </h2>
+        {campaigns.length === 0 ? (
+          <p className="text-xs text-text-muted">Hozircha kampaniya yo‘q.</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {campaigns.slice(0, 10).map((campaign) => (
+              <div
+                key={campaign._id}
+                className="flex flex-wrap items-center justify-between gap-2 py-3 text-xs"
+              >
+                <span className="font-medium">
+                  {campaign.name} · {campaign.segment}
+                </span>
+                <span className="text-text-muted">
+                  {campaign.status === 'TESTED' ? 'Sinov' : campaign.status} ·{' '}
+                  {campaign.sentCount || 0}/{campaign.recipientCount || 0}
+                </span>
+                <time className="text-text-muted">
+                  {new Date(campaign.createdAt).toLocaleString('uz-UZ')}
+                </time>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
-  );
+  )
 }

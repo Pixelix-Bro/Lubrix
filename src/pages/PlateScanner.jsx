@@ -4,56 +4,50 @@ import {
   Camera,
   Car,
   CheckCircle2,
-  ChevronRight,
-  Clock,
   FlipHorizontal,
-  History,
   Image as ImageIcon,
   Loader2,
-  Plus,
-  RefreshCw,
-  Search,
   Sparkles,
   User,
   UserPlus,
-  Volume2,
   Wrench,
-  Zap,
-} from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { createWorker } from 'tesseract.js';
-import { lubrixApi } from '../services/api';
+} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
+import { createWorker } from 'tesseract.js'
+import { lubrixApi } from '../services/api'
 
 export default function PlateScanner() {
-  const theme = useSelector((state) => state.themes.theme);
-  const navigate = useNavigate();
+  const theme = useSelector((state) => state.themes.theme)
+  const navigate = useNavigate()
 
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const fileInputRef = useRef(null)
 
-  const [stream, setStream] = useState(null);
-  const [cameraActive, setCameraActive] = useState(false);
-  const [cameraError, setCameraError] = useState('');
-  const [facingMode, setFacingMode] = useState('environment'); // 'environment' | 'user'
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [stream, setStream] = useState(null)
+  const [cameraActive, setCameraActive] = useState(false)
+  const [cameraError, setCameraError] = useState('')
+  const [scanError, setScanError] = useState('')
+  const [facingMode, setFacingMode] = useState('environment') // 'environment' | 'user'
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [aiPlateEnabled, setAiPlateEnabled] = useState(false)
 
   // Recognition Results
-  const [scannedPlate, setScannedPlate] = useState('');
-  const [confidence, setConfidence] = useState(null);
-  const [matchedVehicle, setMatchedVehicle] = useState(null);
-  const [matchedCustomer, setMatchedCustomer] = useState(null);
-  const [recentServices, setRecentServices] = useState([]);
-  const [searchStatus, setSearchStatus] = useState('idle'); // 'idle' | 'searching' | 'found' | 'not_found'
+  const [scannedPlate, setScannedPlate] = useState('')
+  const [confidence, setConfidence] = useState(null)
+  const [matchedVehicle, setMatchedVehicle] = useState(null)
+  const [matchedCustomer, setMatchedCustomer] = useState(null)
+  const [recentServices, setRecentServices] = useState([])
+  const [searchStatus, setSearchStatus] = useState('idle') // 'idle' | 'searching' | 'found' | 'not_found'
 
   // Initialize camera
   const startCamera = async (mode = facingMode) => {
     try {
-      setCameraError('');
+      setCameraError('')
       if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+        stream.getTracks().forEach((track) => track.stop())
       }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -63,202 +57,227 @@ export default function PlateScanner() {
           height: { ideal: 720 },
         },
         audio: false,
-      });
+      })
 
       if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        await videoRef.current.play();
+        videoRef.current.srcObject = mediaStream
+        await videoRef.current.play()
       }
 
-      setStream(mediaStream);
-      setCameraActive(true);
+      setStream(mediaStream)
+      setCameraActive(true)
     } catch (err) {
-      console.error('Camera access error:', err);
+      console.error('Camera access error:', err)
       setCameraError(
         'Kameraga ulanishda xatolik yuz berdi. Iltimos, brauzerda kamera ruxsatini yoqing yoki fotosurat yuklang.'
-      );
-      setCameraActive(false);
+      )
+      setCameraActive(false)
     }
-  };
+  }
 
   const stopCamera = () => {
     if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
+      stream.getTracks().forEach((track) => track.stop())
+      setStream(null)
     }
-    setCameraActive(false);
-  };
+    setCameraActive(false)
+  }
 
   useEffect(() => {
-    startCamera();
-    return () => stopCamera();
-  }, [facingMode]);
+    if (!stream) return undefined
+    return () => stream.getTracks().forEach((track) => track.stop())
+  }, [stream])
 
   const toggleCameraFacing = () => {
-    const next = facingMode === 'environment' ? 'user' : 'environment';
-    setFacingMode(next);
-  };
+    const next = facingMode === 'environment' ? 'user' : 'environment'
+    setFacingMode(next)
+    if (cameraActive) void startCamera(next)
+  }
 
   // OCR & Plate Parsing Algorithm
   // Cleans up raw OCR string into Uzbek plate format (e.g. 01 A 777 AA or 01 777 AAA)
   const extractUzbekPlate = (rawText) => {
-    if (!rawText) return '';
+    if (!rawText) return ''
     const clean = rawText
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, '')
       .replace(/O/g, '0') // Common OCR confusion of O with zero in digits
-      .trim();
+      .trim()
 
     // Standard Individual Plate: 2 digits + 1 letter + 3 digits + 2 letters (e.g. 01A777AA)
-    const patternStandard = /(\d{2})([A-Z])(\d{3})([A-Z]{2})/;
-    const m1 = clean.match(patternStandard);
+    const patternStandard = /(\d{2})([A-Z])(\d{3})([A-Z]{2})/
+    const m1 = clean.match(patternStandard)
     if (m1) {
-      return `${m1[1]} ${m1[2]} ${m1[3]} ${m1[4]}`;
+      return `${m1[1]} ${m1[2]} ${m1[3]} ${m1[4]}`
     }
 
     // Standard Legal Entity Plate: 2 digits + 3 digits + 3 letters (e.g. 01777AAA)
-    const patternLegal = /(\d{2})([0-9]{3})([A-Z]{3})/;
-    const m2 = clean.match(patternLegal);
+    const patternLegal = /(\d{2})([0-9]{3})([A-Z]{3})/
+    const m2 = clean.match(patternLegal)
     if (m2) {
-      return `${m2[1]} ${m2[2]} ${m2[3]}`;
+      return `${m2[1]} ${m2[2]} ${m2[3]}`
     }
 
     // Fallback: if text looks like a plate
     if (clean.length >= 6 && clean.length <= 9) {
-      return clean;
+      return clean
     }
 
-    return '';
-  };
+    return ''
+  }
 
   // Perform Image Capture and Plate Extraction
   const captureAndRecognize = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current) return
 
     try {
-      setIsAnalyzing(true);
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
+      setIsAnalyzing(true)
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      canvas.width = video.videoWidth || 640
+      canvas.height = video.videoHeight || 480
 
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
       // Extract center ROI where plate is expected
-      const roiWidth = Math.round(canvas.width * 0.7);
-      const roiHeight = Math.round(canvas.height * 0.35);
-      const roiX = Math.round((canvas.width - roiWidth) / 2);
-      const roiY = Math.round((canvas.height - roiHeight) / 2);
+      const roiWidth = Math.round(canvas.width * 0.7)
+      const roiHeight = Math.round(canvas.height * 0.35)
+      const roiX = Math.round((canvas.width - roiWidth) / 2)
+      const roiY = Math.round((canvas.height - roiHeight) / 2)
 
-      const roiData = ctx.getImageData(roiX, roiY, roiWidth, roiHeight);
-
-      let detectedText = '';
-      try {
-        const worker = await createWorker('eng');
-        const ret = await worker.recognize(canvas);
-        detectedText = ret.data.text || '';
-        await worker.terminate();
-      } catch (ocrErr) {
-        console.warn('Tesseract worker error, using fallback:', ocrErr);
-      }
-
-      // If OCR couldn't detect from blur, or for testing demo vehicles
-      let formattedPlate = extractUzbekPlate(detectedText);
-      if (!formattedPlate) {
-        // High-confidence fallback for camera test
-        const demoPlates = ['01 A 777 AA', '01 B 432 BB', '10 X 555 ZZ'];
-        formattedPlate = demoPlates[Math.floor(Math.random() * demoPlates.length)];
-      }
-
-      setScannedPlate(formattedPlate);
-      setConfidence(96);
-      await lookupVehicleInCRM(formattedPlate);
+      const roiCanvas = document.createElement('canvas')
+      roiCanvas.width = roiWidth
+      roiCanvas.height = roiHeight
+      roiCanvas
+        .getContext('2d')
+        .putImageData(ctx.getImageData(roiX, roiY, roiWidth, roiHeight), 0, 0)
+      await recognizeAndLookup(roiCanvas)
     } catch (err) {
-      console.error('Recognition error:', err);
+      console.error('Recognition error:', err)
+      setScanError('Raqamni aniqlab bo‘lmadi. Rasmni tekshirib, qayta urinib ko‘ring.')
     } finally {
-      setIsAnalyzing(false);
+      setIsAnalyzing(false)
     }
-  };
+  }
 
   // Upload an image file for recognition
   const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const file = e.target.files?.[0]
+    if (!file) return
 
-    const reader = new FileReader();
+    setScanError('')
+    const reader = new FileReader()
     reader.onload = async (event) => {
-      const img = new Image();
+      const img = new Image()
       img.onload = async () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
+        const canvas = canvasRef.current
+        if (!canvas) return
+        const scale = Math.min(1, 1280 / Math.max(img.width, img.height))
+        canvas.width = Math.round(img.width * scale)
+        canvas.height = Math.round(img.height * scale)
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
-        setIsAnalyzing(true);
+        setIsAnalyzing(true)
         try {
-          let detectedText = '';
-          if (window.Tesseract) {
-            const result = await window.Tesseract.recognize(canvas, 'eng');
-            detectedText = result?.data?.text || '';
-          }
-          let formattedPlate = extractUzbekPlate(detectedText) || '01 A 777 AA';
-          setScannedPlate(formattedPlate);
-          setConfidence(98);
-          await lookupVehicleInCRM(formattedPlate);
+          await recognizeAndLookup(canvas)
+        } catch (error) {
+          console.error('Image recognition error:', error)
+          setScanError('Rasmni tahlil qilib bo‘lmadi. Boshqa rasm bilan qayta urinib ko‘ring.')
         } finally {
-          setIsAnalyzing(false);
+          setIsAnalyzing(false)
         }
-      };
-      img.src = event.target?.result;
-    };
-    reader.readAsDataURL(file);
-  };
+      }
+      img.onerror = () => setScanError('Yuklangan rasmni ochib bo‘lmadi.')
+      img.src = event.target?.result
+    }
+    reader.onerror = () => setScanError('Rasm faylini o‘qib bo‘lmadi.')
+    reader.readAsDataURL(file)
+  }
+
+  const recognizeAndLookup = async (canvas) => {
+    setScanError('')
+    if (aiPlateEnabled) {
+      const { data } = await lubrixApi.analyzePlateWithAI(canvas.toDataURL('image/jpeg', 0.82))
+      const plate = extractUzbekPlate(data?.data?.plate || '')
+      if (!plate) {
+        setScannedPlate('')
+        setConfidence(null)
+        setMatchedVehicle(null)
+        setMatchedCustomer(null)
+        setRecentServices([])
+        setSearchStatus('unrecognized')
+        return
+      }
+      setScannedPlate(plate)
+      setConfidence(Math.round(Number(data.data.confidence) || 0))
+      await lookupVehicleInCRM(plate)
+      return
+    }
+
+    const worker = await createWorker('eng')
+    try {
+      const result = await worker.recognize(canvas)
+      const plate = extractUzbekPlate(result.data.text || '')
+      if (!plate) {
+        setScannedPlate('')
+        setConfidence(null)
+        setMatchedVehicle(null)
+        setMatchedCustomer(null)
+        setRecentServices([])
+        setSearchStatus('unrecognized')
+        return
+      }
+
+      setScannedPlate(plate)
+      setConfidence(Math.round(result.data.confidence))
+      await lookupVehicleInCRM(plate)
+    } finally {
+      await worker.terminate()
+    }
+  }
 
   // CRM Search by Plate
   const lookupVehicleInCRM = async (plate) => {
     try {
-      setSearchStatus('searching');
-      const cleanSearch = plate.replace(/\s+/g, '');
+      setSearchStatus('searching')
+      const cleanSearch = plate.replace(/\s+/g, '')
       const [vehRes, srvRes] = await Promise.all([
         lubrixApi.getVehicles({ search: cleanSearch }),
         lubrixApi.getServices({ search: cleanSearch }),
-      ]);
+      ])
 
-      const foundVeh = vehRes.data?.data?.[0];
+      const foundVeh = vehRes.data?.data?.[0]
 
       if (foundVeh) {
-        setMatchedVehicle(foundVeh);
-        setSearchStatus('found');
+        setMatchedVehicle(foundVeh)
+        setSearchStatus('found')
 
         // Fetch customer details
         if (foundVeh.customerId) {
           const custId =
-            typeof foundVeh.customerId === 'object'
-              ? foundVeh.customerId._id
-              : foundVeh.customerId;
+            typeof foundVeh.customerId === 'object' ? foundVeh.customerId._id : foundVeh.customerId
           try {
-            const custRes = await lubrixApi.getCustomerById(custId);
-            setMatchedCustomer(custRes.data?.data || null);
+            const custRes = await lubrixApi.getCustomerById(custId)
+            setMatchedCustomer(custRes.data?.data || null)
           } catch {
-            setMatchedCustomer(null);
+            setMatchedCustomer(null)
           }
         }
 
-        setRecentServices(srvRes.data?.data?.slice(0, 3) || []);
+        setRecentServices(srvRes.data?.data?.slice(0, 3) || [])
       } else {
-        setMatchedVehicle(null);
-        setMatchedCustomer(null);
-        setRecentServices([]);
-        setSearchStatus('not_found');
+        setMatchedVehicle(null)
+        setMatchedCustomer(null)
+        setRecentServices([])
+        setSearchStatus('not_found')
       }
     } catch (err) {
-      console.error('Vehicle lookup error:', err);
-      setSearchStatus('not_found');
+      console.error('Vehicle lookup error:', err)
+      setSearchStatus('not_found')
     }
-  };
+  }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -270,7 +289,8 @@ export default function PlateScanner() {
             <span>Kamera orqali Davlat Raqamini Skanerlash (ANPR)</span>
           </h1>
           <p className="text-xs sm:text-sm text-gray-400 mt-1">
-            Avtomobil kamerasini yo‘naltiring — tizim davlat raqamini avtomatik taniydi va mijoz tarixini ochadi
+            Avtomobil kamerasini yo‘naltiring — tizim davlat raqamini avtomatik taniydi va mijoz
+            tarixini ochadi
           </p>
         </div>
 
@@ -316,6 +336,28 @@ export default function PlateScanner() {
         </div>
       )}
 
+      {scanError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400"
+        >
+          {scanError}
+        </div>
+      )}
+
+      <label className="flex items-start gap-2.5 border-b border-border pb-4 text-xs leading-5 text-text-muted">
+        <input
+          type="checkbox"
+          checked={aiPlateEnabled}
+          onChange={(event) => setAiPlateEnabled(event.target.checked)}
+          className="mt-1 accent-emerald-600"
+        />
+        <span>
+          AI orqali raqam aniqlash. Rasm tahlil uchun AI provayderiga yuboriladi; o‘chiq bo‘lsa rasm
+          faqat lokal OCR bilan tekshiriladi.
+        </span>
+      </label>
+
       {/* Main Scanner Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Live Camera Feed with Overlay */}
@@ -348,7 +390,7 @@ export default function PlateScanner() {
                 <span className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-emerald-400" />
 
                 {/* Laser Scanning Line Animation */}
-                <div className="absolute inset-x-2 top-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#10B981] animate-pulse" />
+                <div className="absolute inset-x-2 top-0 h-0.5 bg-linear-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#10B981] animate-pulse" />
 
                 <div className="text-[11px] font-mono text-emerald-400/90 tracking-wider font-semibold bg-black/60 px-2.5 py-1 rounded-full backdrop-blur-xs">
                   DAVLAT RAQAMINI SHU YERGA YO'NALTIRING
@@ -421,7 +463,7 @@ export default function PlateScanner() {
                 <Sparkles size={14} />
                 <span>Skaner Natijasi</span>
               </span>
-              {confidence && (
+              {confidence !== null && (
                 <span className="text-[11px] font-mono text-emerald-400 font-semibold">
                   Aniqlik: {confidence}%
                 </span>
@@ -463,7 +505,8 @@ export default function PlateScanner() {
 
                   <div className="space-y-1.5 text-xs">
                     <p className="font-semibold text-sm">
-                      {matchedVehicle.make} {matchedVehicle.model} ({matchedVehicle.modelYear || 2023})
+                      {matchedVehicle.make} {matchedVehicle.model} (
+                      {matchedVehicle.modelYear || 2023})
                     </p>
                     <p className="text-gray-400">
                       Joriy Probeg:{' '}
@@ -507,14 +550,18 @@ export default function PlateScanner() {
                           }`}
                         >
                           <div className="flex items-center justify-between font-semibold">
-                            <span>{s.oilBrand} ({s.viscosity})</span>
+                            <span>
+                              {s.oilBrand} ({s.viscosity})
+                            </span>
                             <span className="text-emerald-400 font-mono">
                               {(Number(s.price) || 0).toLocaleString()} UZS
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1 font-mono">
                             <span>Probeg: {s.odometerKm?.toLocaleString()} km</span>
-                            <span>{new Date(s.serviceDate || s.createdAt).toLocaleDateString('uz-UZ')}</span>
+                            <span>
+                              {new Date(s.serviceDate || s.createdAt).toLocaleDateString('uz-UZ')}
+                            </span>
                           </div>
                         </div>
                       ))}
@@ -527,7 +574,7 @@ export default function PlateScanner() {
                   onClick={() => {
                     navigate(
                       `/services?search=${encodeURIComponent(matchedVehicle.plateNumber)}&autoOpen=true`
-                    );
+                    )
                   }}
                   className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-[title] font-bold text-xs tracking-wider transition shadow-lg shadow-emerald-600/25"
                 >
@@ -535,6 +582,14 @@ export default function PlateScanner() {
                   <span>XIZMATNI BOSHLASH (MOY ALMASHTIRISH)</span>
                   <ArrowRight size={14} />
                 </button>
+              </div>
+            ) : searchStatus === 'unrecognized' ? (
+              <div
+                role="status"
+                className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-5 text-center text-xs text-amber-200"
+              >
+                Davlat raqami aniq topilmadi. Raqamni kadr markaziga joylab yoki ravshanroq rasm
+                yuklab qayta urinib ko‘ring.
               </div>
             ) : searchStatus === 'not_found' ? (
               <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center space-y-3">
@@ -552,7 +607,7 @@ export default function PlateScanner() {
                   onClick={() => {
                     navigate(
                       `/customers?newPlate=${encodeURIComponent(scannedPlate)}&openModal=true`
-                    );
+                    )
                   }}
                   className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-primary hover:bg-blue-600 text-white font-medium text-xs transition"
                 >
@@ -565,5 +620,5 @@ export default function PlateScanner() {
         </div>
       </div>
     </div>
-  );
+  )
 }

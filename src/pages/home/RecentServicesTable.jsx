@@ -1,33 +1,48 @@
-import { Loader2, Search } from 'lucide-react';
-import { useState } from 'react';
-import { useSelector } from 'react-redux';
+import { Loader2, Search } from 'lucide-react'
+import { useState } from 'react'
+import { useSelector } from 'react-redux'
 
 /**
  * RecentServicesTable — so'nggi xizmatlar jadvali
  */
-export default function RecentServicesTable({ services = [], loading }) {
-  const theme = useSelector((s) => s.themes.theme);
-  const [search, setSearch] = useState('');
+export default function RecentServicesTable({ services = [], transactions = [], loading }) {
+  const theme = useSelector((s) => s.themes.theme)
+  const [search, setSearch] = useState('')
+  const settledServiceIds = new Set(
+    transactions.map((transaction) => String(transaction.serviceId || '')).filter(Boolean)
+  )
+  const rows = [
+    ...services
+      .filter((service) => !settledServiceIds.has(String(service._id || service.id)))
+      .map((service) => ({ ...service, rowType: 'service' })),
+    ...transactions.map((transaction) => ({ ...transaction, rowType: 'transaction' })),
+  ].sort(
+    (left, right) =>
+      new Date(right.paidAt || right.serviceDate || right.createdAt) -
+      new Date(left.paidAt || left.serviceDate || left.createdAt)
+  )
 
   const filtered = search
-    ? services.filter((s) => {
-        const q = search.toLowerCase();
+    ? rows.filter((s) => {
+        const q = search.toLowerCase()
         return (
           s.customerName?.toLowerCase().includes(q) ||
           s.plate?.toLowerCase().includes(q) ||
           s.vehicle?.toLowerCase().includes(q) ||
           s.oilBrand?.toLowerCase().includes(q)
-        );
+        )
       })
-    : services.slice(0, 7);
+    : rows.slice(0, 7)
 
   return (
-    <div className={`p-5 rounded-2xl border ${theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white shadow-sm'}`}>
+    <div
+      className={`p-5 rounded-2xl border ${theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white shadow-sm'}`}
+    >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
-          <h2 className="text-base font-bold font-[title]">So'nggi Moy Almashtirish Xizmatlari</h2>
-          <p className="text-xs text-gray-400">Oxirgi amalga oshirilgan xizmatlar ro'yxati</p>
+          <h2 className="text-base font-bold font-[title]">So‘nggi Savdo va Xizmatlar</h2>
+          <p className="text-xs text-gray-400">Kassa to‘lovlari va servis yozuvlari</p>
         </div>
         <div
           className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs sm:w-60 ${
@@ -56,7 +71,9 @@ export default function RecentServicesTable({ services = [], loading }) {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className={`text-xs uppercase font-[title] border-b ${theme ? 'border-white/10 bg-white/5 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-600'}`}>
+            <thead
+              className={`text-xs uppercase font-[title] border-b ${theme ? 'border-white/10 bg-white/5 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-600'}`}
+            >
               <tr>
                 <th className="px-4 py-3">Mijoz</th>
                 <th className="px-4 py-3">Avtomobil & Raqam</th>
@@ -66,27 +83,49 @@ export default function RecentServicesTable({ services = [], loading }) {
                 <th className="px-4 py-3 text-right">Summa</th>
               </tr>
             </thead>
-            <tbody className={`divide-y text-xs sm:text-sm ${theme ? 'divide-white/5 text-gray-200' : 'divide-gray-100 text-gray-800'}`}>
+            <tbody
+              className={`divide-y text-xs sm:text-sm ${theme ? 'divide-white/5 text-gray-200' : 'divide-gray-100 text-gray-800'}`}
+            >
               {filtered.map((s) => (
                 <tr key={s._id || s.id} className={theme ? 'hover:bg-white/5' : 'hover:bg-gray-50'}>
                   <td className="px-4 py-3">
                     <div className="font-semibold">{s.customerName || 'Mijoz'}</div>
                     <div className="text-[11px] text-gray-400">
-                      {new Date(s.serviceDate || s.createdAt).toLocaleDateString('uz-UZ')}
+                      {new Date(s.paidAt || s.serviceDate || s.createdAt).toLocaleDateString(
+                        'uz-UZ'
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-primary font-mono font-bold text-[11px]">
-                        {s.plate || '—'}
+                    {s.rowType === 'transaction' ? (
+                      <span className="text-xs text-gray-400">
+                        POS · {s.provider || 'Kassa'}
+                        {s.receiptNumber ? ` · ${s.receiptNumber}` : ''}
                       </span>
-                      <span className="text-xs text-gray-400">{s.vehicle || ''}</span>
-                    </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-primary font-mono font-bold text-[11px]">
+                          {s.plate || '—'}
+                        </span>
+                        <span className="text-xs text-gray-400">{s.vehicle || ''}</span>
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="font-medium">{s.oilBrand}</span>{' '}
-                    <span className="text-amber-400 font-mono text-xs">{s.viscosity}</span>
-                    <span className="text-gray-400 text-xs ml-1">({s.oilQuantity || 4}L)</span>
+                    {s.rowType === 'transaction' ? (
+                      <span className="text-xs text-gray-400">
+                        {(s.items || [])
+                          .map((item) => item.name)
+                          .filter(Boolean)
+                          .join(', ') || 'Bir martalik savdo'}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="font-medium">{s.oilBrand}</span>{' '}
+                        <span className="text-amber-400 font-mono text-xs">{s.viscosity}</span>
+                        <span className="text-gray-400 text-xs ml-1">({s.oilQuantity || 4}L)</span>
+                      </>
+                    )}
                   </td>
                   <td className="px-4 py-3 font-mono">{(s.odometerKm || 0).toLocaleString()} km</td>
                   <td className="px-4 py-3">
@@ -98,7 +137,10 @@ export default function RecentServicesTable({ services = [], loading }) {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right font-bold text-emerald-400 font-mono">
-                    {(Number(s.price) || 0).toLocaleString()} UZS
+                    {(
+                      Number(s.rowType === 'transaction' ? s.amount : s.price) || 0
+                    ).toLocaleString()}{' '}
+                    UZS
                   </td>
                 </tr>
               ))}
@@ -107,5 +149,5 @@ export default function RecentServicesTable({ services = [], loading }) {
         </div>
       )}
     </div>
-  );
+  )
 }

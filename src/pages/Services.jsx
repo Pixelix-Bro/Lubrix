@@ -1,97 +1,120 @@
-import {
-  AlertCircle,
-  Calendar,
-  Car,
-  CheckCircle2,
-  Clock,
-  Droplet,
-  Filter,
-  Gauge,
-  Loader2,
-  Plus,
-  Search,
-  User,
-  Wrench,
-  X,
-} from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
-import { useSearchParams } from 'react-router-dom';
-import { lubrixApi } from '../services/api';
-import { lubrixSocket } from '../services/socket';
+import { AlertCircle, CheckCircle2, Gauge, Loader2, Plus, Search, Wrench, X } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
+import { useSearchParams } from 'react-router-dom'
+import { lubrixApi } from '../services/api'
+import { lubrixSocket } from '../services/socket'
 
 export default function Services() {
-  const theme = useSelector((state) => state.themes.theme);
-  const [searchParams] = useSearchParams();
-  const urlSearch = searchParams.get('search') || '';
+  const theme = useSelector((state) => state.themes.theme)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const search = searchParams.get('search') || ''
+  const customerFilterId = searchParams.get('customerId') || ''
+  const serviceIdFilter = searchParams.get('serviceId') || ''
 
-  const [services, setServices] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [vehicles, setVehicles] = useState([]);
-  const [search, setSearch] = useState(urlSearch);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [services, setServices] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [vehicles, setVehicles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   // Form State
-  const [customerId, setCustomerId] = useState('');
-  const [vehicleId, setVehicleId] = useState('');
-  const [odometerKm, setOdometerKm] = useState('');
-  const [oilBrand, setOilBrand] = useState('Castrol');
-  const [oilType, setOilType] = useState('Synthetic');
-  const [viscosity, setViscosity] = useState('5W-30');
-  const [oilQuantity, setOilQuantity] = useState('4');
-  const [price, setPrice] = useState('450000');
-  const [intervalDays, setIntervalDays] = useState('90');
-  const [intervalKm, setIntervalKm] = useState('7000');
-  const [notes, setNotes] = useState('');
+  const [customerId, setCustomerId] = useState('')
+  const [vehicleId, setVehicleId] = useState('')
+  const [odometerKm, setOdometerKm] = useState('')
+  const [oilBrand, setOilBrand] = useState('Castrol')
+  const [oilType, setOilType] = useState('Synthetic')
+  const [viscosity, setViscosity] = useState('5W-30')
+  const [oilQuantity, setOilQuantity] = useState('')
+  const [price, setPrice] = useState('450000')
+  const [intervalDays, setIntervalDays] = useState('90')
+  const [intervalKm, setIntervalKm] = useState('7000')
+  const [notes, setNotes] = useState('')
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
-      setLoading(true);
+      setLoading(true)
       const [srvRes, custRes, vehRes] = await Promise.all([
         lubrixApi.getServices(),
         lubrixApi.getCustomers(),
         lubrixApi.getVehicles(),
-      ]);
+      ])
 
-      setServices(srvRes.data?.data || []);
-      setCustomers(custRes.data?.data || []);
-      setVehicles(vehRes.data?.data || []);
+      setServices(srvRes.data?.data || [])
+      setCustomers(custRes.data?.data || [])
+      setVehicles(vehRes.data?.data || [])
     } catch (err) {
-      console.error('Error loading services:', err);
+      console.error('Error loading services:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }, [])
 
   useEffect(() => {
-    loadData();
+    const timer = window.setTimeout(() => void loadData(), 0)
 
     const unsub = lubrixSocket.subscribe('service:created', (newSrv) => {
-      setServices((prev) => [newSrv, ...prev]);
-    });
-    return () => unsub();
-  }, []);
+      setServices((prev) => [newSrv, ...prev])
+    })
+    return () => {
+      window.clearTimeout(timer)
+      unsub()
+    }
+  }, [loadData])
 
   // Filter vehicles when customer changes
   const customerVehicles = vehicles.filter(
     (v) =>
       (typeof v.customerId === 'object' ? v.customerId?._id : v.customerId) === customerId ||
       v.customerId === customerId
-  );
+  )
+
+  useEffect(() => {
+    if (loading || searchParams.get('autoOpen') !== 'true') return undefined
+
+    const timer = window.setTimeout(() => {
+      const plateSearch = searchParams.get('search') || ''
+      const targetVehicle = vehicles.find(
+        (vehicle) =>
+          vehicle.plateNumber?.replace(/\s+/g, '').toUpperCase() ===
+          plateSearch.replace(/\s+/g, '').toUpperCase()
+      )
+      const targetCustomerId =
+        searchParams.get('customerId') ||
+        (typeof targetVehicle?.customerId === 'object'
+          ? targetVehicle.customerId?._id
+          : targetVehicle?.customerId)
+
+      if (targetCustomerId) setCustomerId(String(targetCustomerId))
+      if (targetVehicle) {
+        setVehicleId(targetVehicle._id || targetVehicle.id)
+        setOdometerKm(String(targetVehicle.currentOdometerKm || ''))
+      }
+      if (searchParams.has('brand')) setOilBrand(searchParams.get('brand'))
+      if (searchParams.has('viscosity')) setViscosity(searchParams.get('viscosity'))
+      if (searchParams.has('qty')) setOilQuantity(searchParams.get('qty'))
+      setIsModalOpen(true)
+
+      const nextParams = new URLSearchParams(searchParams)
+      for (const key of ['autoOpen', 'brand', 'viscosity', 'qty']) nextParams.delete(key)
+      setSearchParams(nextParams, { replace: true })
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [loading, searchParams, setSearchParams, vehicles])
 
   const handleCreateService = async (e) => {
-    e.preventDefault();
-    if (!customerId || !vehicleId || !odometerKm) {
-      setError('Mijoz, avtomobil va probeg kiritilishi shart!');
-      return;
+    e.preventDefault()
+    if (!customerId || !vehicleId || !odometerKm || !oilQuantity || Number(oilQuantity) <= 0) {
+      setError('Mijoz, avtomobil, probeg va moy miqdori kiritilishi shart.')
+      return
     }
 
     try {
-      setSubmitting(true);
-      setError('');
+      setSubmitting(true)
+      setError('')
       await lubrixApi.createService({
         customerId,
         vehicleId,
@@ -104,43 +127,46 @@ export default function Services() {
         intervalDays: Number(intervalDays),
         intervalKm: Number(intervalKm),
         notes,
-      });
+      })
 
-      setIsModalOpen(false);
-      resetForm();
-      await loadData();
+      setIsModalOpen(false)
+      resetForm()
+      await loadData()
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Xatolik yuz berdi');
+      setError(err.response?.data?.error || err.message || 'Xatolik yuz berdi')
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  };
+  }
 
   const resetForm = () => {
-    setCustomerId('');
-    setVehicleId('');
-    setOdometerKm('');
-    setOilBrand('Castrol');
-    setOilType('Synthetic');
-    setViscosity('5W-30');
-    setOilQuantity('4');
-    setPrice('450000');
-    setIntervalDays('90');
-    setIntervalKm('7000');
-    setNotes('');
-    setError('');
-  };
+    setCustomerId('')
+    setVehicleId('')
+    setOdometerKm('')
+    setOilBrand('Castrol')
+    setOilType('Synthetic')
+    setViscosity('5W-30')
+    setOilQuantity('')
+    setPrice('450000')
+    setIntervalDays('90')
+    setIntervalKm('7000')
+    setNotes('')
+    setError('')
+  }
 
   const filteredServices = services.filter((s) => {
-    const q = search.toLowerCase();
+    if (serviceIdFilter && String(s._id || s.id) !== serviceIdFilter) return false
+    const q = search.toLowerCase()
+    const serviceCustomerId = typeof s.customerId === 'object' ? s.customerId?._id : s.customerId
+    if (customerFilterId && String(serviceCustomerId) !== customerFilterId) return false
     return (
       (s.customerName && s.customerName.toLowerCase().includes(q)) ||
       (s.plate && s.plate.toLowerCase().includes(q)) ||
       (s.vehicle && s.vehicle.toLowerCase().includes(q)) ||
       (s.oilBrand && s.oilBrand.toLowerCase().includes(q)) ||
       (s.viscosity && s.viscosity.toLowerCase().includes(q))
-    );
-  });
+    )
+  })
 
   return (
     <div className="space-y-6">
@@ -158,8 +184,8 @@ export default function Services() {
 
         <button
           onClick={() => {
-            resetForm();
-            setIsModalOpen(true);
+            resetForm()
+            setIsModalOpen(true)
           }}
           className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-blue-600 text-white font-medium text-sm transition shadow-lg shadow-blue-500/20 shrink-0"
         >
@@ -179,7 +205,12 @@ export default function Services() {
           <input
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => {
+              const nextParams = new URLSearchParams(searchParams)
+              if (event.target.value) nextParams.set('search', event.target.value)
+              else nextParams.delete('search')
+              setSearchParams(nextParams, { replace: true })
+            }}
             placeholder="Mijoz ismi, avtomobil raqami yoki moy markasi bo‘yicha qidirish..."
             className="w-full bg-transparent outline-none text-sm placeholder:text-gray-500"
           />
@@ -191,9 +222,7 @@ export default function Services() {
           }`}
         >
           <span className="text-xs sm:text-sm text-gray-400">Jami Xizmatlar:</span>
-          <span className="font-[title] font-bold text-lg text-primary">
-            {services.length} ta
-          </span>
+          <span className="font-[title] font-bold text-lg text-primary">{services.length} ta</span>
         </div>
       </div>
 
@@ -244,9 +273,7 @@ export default function Services() {
                 {filteredServices.map((s) => (
                   <tr
                     key={s._id || s.id}
-                    className={`transition ${
-                      theme ? 'hover:bg-white/5' : 'hover:bg-gray-50/80'
-                    }`}
+                    className={`transition ${theme ? 'hover:bg-white/5' : 'hover:bg-gray-50/80'}`}
                   >
                     <td className="px-5 py-4 text-xs text-gray-400">
                       {new Date(s.serviceDate || s.createdAt).toLocaleDateString('uz-UZ')}
@@ -264,7 +291,8 @@ export default function Services() {
 
                     <td className="px-5 py-4">
                       <div className="font-medium text-xs sm:text-sm">
-                        {s.oilBrand} · <span className="font-mono text-amber-400">{s.viscosity}</span>
+                        {s.oilBrand} ·{' '}
+                        <span className="font-mono text-amber-400">{s.viscosity}</span>
                       </div>
                       <div className="text-[11px] text-gray-400">
                         {s.oilType} ({s.oilQuantity || 4} Litr)
@@ -310,7 +338,9 @@ export default function Services() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
           <div
             className={`w-full max-w-xl rounded-2xl border p-6 shadow-2xl relative my-8 transition-all ${
-              theme ? 'border-white/10 bg-surface text-white' : 'border-gray-200 bg-white text-gray-900'
+              theme
+                ? 'border-white/10 bg-surface text-white'
+                : 'border-gray-200 bg-white text-gray-900'
             }`}
           >
             <button
@@ -325,7 +355,8 @@ export default function Services() {
               <span>Yangi Xizmat Yozuvi</span>
             </h2>
             <p className="text-xs text-gray-400 mb-5">
-              Avtomobilga moy quyish ma'lumotlarini kiriting. Keyingi servis muddati avtomatik hisoblanadi.
+              Avtomobilga moy quyish ma'lumotlarini kiriting. Keyingi servis muddati avtomatik
+              hisoblanadi.
             </p>
 
             {error && (
@@ -345,8 +376,8 @@ export default function Services() {
                   <select
                     value={customerId}
                     onChange={(e) => {
-                      setCustomerId(e.target.value);
-                      setVehicleId('');
+                      setCustomerId(e.target.value)
+                      setVehicleId('')
                     }}
                     required
                     className={`w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none transition ${
@@ -377,10 +408,10 @@ export default function Services() {
                   <select
                     value={vehicleId}
                     onChange={(e) => {
-                      setVehicleId(e.target.value);
-                      const selVeh = vehicles.find((v) => (v._id || v.id) === e.target.value);
+                      setVehicleId(e.target.value)
+                      const selVeh = vehicles.find((v) => (v._id || v.id) === e.target.value)
                       if (selVeh?.currentOdometerKm) {
-                        setOdometerKm(selVeh.currentOdometerKm);
+                        setOdometerKm(selVeh.currentOdometerKm)
                       }
                     }}
                     required
@@ -492,10 +523,10 @@ export default function Services() {
                   </label>
                   <input
                     type="number"
-                    step="0.5"
+                    min="0.01"
+                    step="0.01"
                     value={oilQuantity}
                     onChange={(e) => setOilQuantity(e.target.value)}
-                    placeholder="4"
                     required
                     className={`w-full px-3 py-2 rounded-xl border text-xs outline-none transition ${
                       theme
@@ -592,5 +623,5 @@ export default function Services() {
         </div>
       )}
     </div>
-  );
+  )
 }

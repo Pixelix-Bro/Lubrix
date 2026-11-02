@@ -10,9 +10,16 @@ export class SmsAdapter {
 }
 
 export class MockSmsAdapter extends SmsAdapter {
-  async sendSms({ to, message, organizationId }) {
+  constructor() {
+    super()
+    this.isMock = true
+  }
+
+  async sendSms({ organizationId }) {
     const mockId = `mock_sms_${Date.now()}_${Math.floor(Math.random() * 1000)}`
-    console.log(`[LUBRIX SMS MOCK] To: ${to} | Msg: "${message}" | Tenant: ${organizationId}`)
+    console.info(
+      `[LUBRIX SMS MOCK] Simulated message for organization ${organizationId}; payload omitted`
+    )
     return {
       success: true,
       providerMessageId: mockId,

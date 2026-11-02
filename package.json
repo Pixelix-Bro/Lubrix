@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "start": "node apps/api/src/server.js",
     "server": "node apps/api/src/server.js",
-    "seed": "node apps/api/src/utils/seedData.js"
+    "seed": "node apps/api/src/utils/seedData.js",
+    "test:api": "node --test apps/api/src/config/*.test.js apps/api/src/middleware/*.test.js apps/api/src/modules/analytics/*.test.js apps/api/src/modules/assistant/*.test.js apps/api/src/modules/customers/*.test.js apps/api/src/modules/inspections/*.test.js apps/api/src/modules/payments/*.test.js apps/api/src/modules/services/*.test.js apps/api/src/modules/settings/*.test.js apps/api/src/modules/telegram/*.test.js apps/api/src/realtime/*.test.js apps/api/src/utils/*.test.js"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
@@ -31,6 +32,8 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.61.0",
     "mongoose": "^9.11.4",
+    "multer": "^2.5.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-redux": "^9.3.0",

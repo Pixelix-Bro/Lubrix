@@ -1,6 +1,7 @@
 import { useSelector } from 'react-redux'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
+import AssistantLauncher from '../components/AssistantLauncher'
 import SiteBar from '../components/SiteBar'
 import Top from '../components/Top'
 export default function Layout() {
@@ -30,14 +31,15 @@ export default function Layout() {
         <main
           className={`
             min-w-0 flex-1
-            p-3 pt-[76px] sm:p-4 sm:pt-[79px]
+            p-3 pt-19 sm:p-4 sm:pt-19.75
             transition-[margin,padding] duration-300
-            ${isAuthPage ? 'p-0 pt-0' : isSidebarCollapsed ? 'md:ml-[80px]' : 'md:ml-[230px]'}
+            ${isAuthPage ? 'p-0 pt-0' : isSidebarCollapsed ? 'md:ml-20' : 'md:ml-57.5'}
           `}
         >
           <Outlet />
         </main>
       </div>
+      {!isAuthPage && <AssistantLauncher />}
     </div>
   )
 }

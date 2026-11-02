@@ -8,6 +8,11 @@ export function useVoiceSearch({ onResult, lang = 'uz-UZ' } = {}) {
     typeof window !== 'undefined' &&
     Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
   const recognitionRef = useRef(null)
+  const onResultRef = useRef(onResult)
+
+  useEffect(() => {
+    onResultRef.current = onResult
+  }, [onResult])
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -30,8 +35,8 @@ export function useVoiceSearch({ onResult, lang = 'uz-UZ' } = {}) {
       setTranscript(text)
 
       if (event.results[current].isFinal) {
-        if (onResult) {
-          onResult(text)
+        if (onResultRef.current) {
+          onResultRef.current(text)
         }
       }
     }
@@ -63,7 +68,7 @@ export function useVoiceSearch({ onResult, lang = 'uz-UZ' } = {}) {
         }
       }
     }
-  }, [lang, onResult])
+  }, [lang])
 
   const startListening = useCallback((customLang) => {
     if (!recognitionRef.current) return

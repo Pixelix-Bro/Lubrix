@@ -3,6 +3,7 @@ import {
   Car,
   Loader2,
   Mail,
+  Pencil,
   Phone,
   Plus,
   Search,
@@ -14,16 +15,19 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { lubrixApi } from '../services/api'
 import { lubrixSocket } from '../services/socket'
+import { fileToImageDataUrl } from '../utils/imageDataUrl'
 
 export default function Customers() {
   const theme = useSelector((state) => state.themes.theme)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const search = searchParams.get('search') || ''
   const [customers, setCustomers] = useState([])
   const [vehicles, setVehicles] = useState([])
-  const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingCustomerId, setEditingCustomerId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -32,6 +36,9 @@ export default function Customers() {
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('+998')
   const [email, setEmail] = useState('')
+  const [smsConsent, setSmsConsent] = useState(false)
+  const [customerPhoto, setCustomerPhoto] = useState('')
+  const [vehiclePhoto, setVehiclePhoto] = useState('')
   const [plateNumber, setPlateNumber] = useState('')
   const [carMake, setCarMake] = useState('')
   const [carModel, setCarModel] = useState('')
@@ -58,10 +65,22 @@ export default function Customers() {
     const unsub = lubrixSocket.subscribe('customer:created', (newCust) => {
       setCustomers((prev) => [newCust, ...prev])
     })
-    return () => unsub()
+    const unsubUpdated = lubrixSocket.subscribe('customer:updated', (updatedCustomer) => {
+      setCustomers((prev) =>
+        prev.map((customer) =>
+          String(customer._id || customer.id) === String(updatedCustomer._id || updatedCustomer.id)
+            ? updatedCustomer
+            : customer
+        )
+      )
+    })
+    return () => {
+      unsub()
+      unsubUpdated()
+    }
   }, [search, loadData])
 
-  const handleCreateCustomer = async (e) => {
+  const handleSaveCustomer = async (e) => {
     e.preventDefault()
     if (!fullName || !phone) {
       setError('Mijoz ismi va telefon raqami talab qilinadi')
@@ -71,16 +90,31 @@ export default function Customers() {
     try {
       setSubmitting(true)
       setError('')
-      const res = await lubrixApi.createCustomer({ fullName, phone, email })
-      const createdCust = res.data?.data
+      const res = editingCustomerId
+        ? await lubrixApi.updateCustomer(editingCustomerId, {
+            fullName,
+            phone,
+            email,
+            smsConsent,
+            photoUrl: customerPhoto,
+          })
+        : await lubrixApi.createCustomer({
+            fullName,
+            phone,
+            email,
+            smsConsent,
+            photoUrl: customerPhoto,
+          })
+      const savedCustomer = res.data?.data
 
       // Agar avtomobil ma'lumotlari kiritilgan bo'lsa, uni ham saqlaymiz
-      if (plateNumber && createdCust) {
+      if (!editingCustomerId && plateNumber && savedCustomer) {
         await lubrixApi.createVehicle({
-          customerId: createdCust._id || createdCust.id,
+          customerId: savedCustomer._id || savedCustomer.id,
           plateNumber,
           make: carMake,
           model: carModel,
+          imageUrl: vehiclePhoto,
           currentOdometerKm: odometerKm ? Number(odometerKm) : 0,
         })
       }
@@ -96,14 +130,102 @@ export default function Customers() {
   }
 
   const resetForm = () => {
+    setEditingCustomerId(null)
     setFullName('')
     setPhone('+998')
     setEmail('')
+    setSmsConsent(false)
+    setCustomerPhoto('')
+    setVehiclePhoto('')
     setPlateNumber('')
     setCarMake('')
     setCarModel('')
     setOdometerKm('')
     setError('')
+  }
+
+  useEffect(() => {
+    const editId = searchParams.get('customerId')
+    if (searchParams.get('edit') === 'true' && editId) {
+      let active = true
+      const timer = window.setTimeout(async () => {
+        try {
+          const response = await lubrixApi.getCustomerById(editId)
+          if (!active) return
+          const customer = response.data?.data
+          if (!customer) return
+          setEditingCustomerId(customer._id || customer.id)
+          setFullName(customer.fullName || '')
+          setPhone(customer.phoneE164 || customer.phone || '')
+          setEmail(customer.email || '')
+          setCustomerPhoto(customer.photoUrl || '')
+          setVehiclePhoto('')
+          setSmsConsent(
+            Boolean(customer.smsConsentAt && customer.smsConsentSource && !customer.optedOutAt)
+          )
+          setPlateNumber('')
+          setCarMake('')
+          setCarModel('')
+          setOdometerKm('')
+          setError('')
+          setIsModalOpen(true)
+        } catch (requestError) {
+          if (active) setError(requestError.response?.data?.error || 'Mijozni yuklab bo‘lmadi')
+        } finally {
+          if (active) {
+            const nextParams = new URLSearchParams(searchParams)
+            nextParams.delete('customerId')
+            nextParams.delete('edit')
+            setSearchParams(nextParams, { replace: true })
+          }
+        }
+      }, 0)
+      return () => {
+        active = false
+        window.clearTimeout(timer)
+      }
+    }
+
+    const newPlate = searchParams.get('newPlate')
+    if (searchParams.get('openModal') !== 'true' || !newPlate) return
+
+    const timer = window.setTimeout(() => {
+      setEditingCustomerId(null)
+      setFullName('')
+      setPhone('+998')
+      setEmail('')
+      setCustomerPhoto('')
+      setVehiclePhoto('')
+      setPlateNumber(newPlate.toUpperCase())
+      setCarMake('')
+      setCarModel('')
+      setOdometerKm('')
+      setError('')
+      setIsModalOpen(true)
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.delete('newPlate')
+      nextParams.delete('openModal')
+      setSearchParams(nextParams, { replace: true })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [searchParams, setSearchParams])
+
+  const handleEditCustomer = (customer) => {
+    setEditingCustomerId(customer._id || customer.id)
+    setFullName(customer.fullName || '')
+    setPhone(customer.phoneE164 || customer.phone || '')
+    setEmail(customer.email || '')
+    setCustomerPhoto(customer.photoUrl || '')
+    setVehiclePhoto('')
+    setSmsConsent(
+      Boolean(customer.smsConsentAt && customer.smsConsentSource && !customer.optedOutAt)
+    )
+    setPlateNumber('')
+    setCarMake('')
+    setCarModel('')
+    setOdometerKm('')
+    setError('')
+    setIsModalOpen(true)
   }
 
   // Find vehicles for a customer
@@ -128,8 +250,8 @@ export default function Customers() {
             Barcha xizmat oluvchi avto egalari va ularning transport vositalari ro‘yxati
           </p>
         </div>
-
         <button
+          type="button"
           onClick={() => {
             resetForm()
             setIsModalOpen(true)
@@ -152,7 +274,12 @@ export default function Customers() {
           <input
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => {
+              const nextParams = new URLSearchParams(searchParams)
+              if (event.target.value) nextParams.set('search', event.target.value)
+              else nextParams.delete('search')
+              setSearchParams(nextParams, { replace: true })
+            }}
             placeholder="Mijoz ismi, telefon raqami yoki avtomobil bo‘yicha qidirish..."
             className="w-full bg-transparent outline-none text-sm placeholder:text-gray-500"
           />
@@ -220,7 +347,21 @@ export default function Customers() {
                       className={`transition ${theme ? 'hover:bg-white/5' : 'hover:bg-gray-50/80'}`}
                     >
                       <td className="px-5 py-4">
-                        <div className="font-semibold text-sm">{c.fullName}</div>
+                        <div className="flex items-center gap-2">
+                          {c.photoUrl && (
+                            <img
+                              src={c.photoUrl}
+                              alt=""
+                              className="h-8 w-8 rounded-full object-cover"
+                            />
+                          )}
+                          <Link
+                            to={`/customers/${c._id || c.id}`}
+                            className="font-semibold text-sm hover:text-primary hover:underline"
+                          >
+                            {c.fullName}
+                          </Link>
+                        </div>
                         <div className="text-[11px] text-gray-400">
                           Qo‘shilgan:{' '}
                           {c.createdAt ? new Date(c.createdAt).toLocaleDateString('uz-UZ') : '—'}
@@ -262,13 +403,32 @@ export default function Customers() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          <ShieldCheck size={12} />
-                          <span>Rozilik berilgan</span>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${c.optedOutAt ? 'border-red-500/20 bg-red-500/10 text-red-400' : c.smsConsentAt && c.smsConsentSource ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' : 'border-slate-500/20 bg-slate-500/10 text-slate-400'}`}
+                        >
+                          {c.smsConsentAt && c.smsConsentSource && !c.optedOutAt && (
+                            <ShieldCheck size={12} />
+                          )}
+                          <span>
+                            {c.optedOutAt
+                              ? 'Bekor qilingan'
+                              : c.smsConsentAt && c.smsConsentSource
+                                ? 'Rozilik qayd etilgan'
+                                : 'Rozilik yo‘q'}
+                          </span>
                         </span>
                       </td>
 
                       <td className="px-5 py-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleEditCustomer(c)}
+                          title="Mijozni tahrirlash"
+                          aria-label={`Mijozni tahrirlash: ${c.fullName}`}
+                          className="inline-flex items-center justify-center p-2 mr-1 rounded-lg text-gray-400 hover:text-primary hover:bg-primary/10 transition"
+                        >
+                          <Pencil size={15} />
+                        </button>
                         <Link
                           to={`/services?customerId=${c._id || c.id}`}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition"
@@ -286,7 +446,7 @@ export default function Customers() {
         )}
       </div>
 
-      {/* Create Customer Modal */}
+      {/* Create or edit customer modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div
@@ -305,10 +465,12 @@ export default function Customers() {
 
             <h2 className="text-lg font-bold font-[title] mb-1 flex items-center gap-2">
               <UserCheck className="text-primary" size={20} />
-              <span>Yangi Mijoz Qo‘shish</span>
+              <span>{editingCustomerId ? 'Mijozni Tahrirlash' : 'Yangi Mijoz Qo‘shish'}</span>
             </h2>
             <p className="text-xs text-gray-400 mb-5">
-              Mijoz kontaktlari va birinchi avtomobil ma'lumotlarini kiriting
+              {editingCustomerId
+                ? 'Mijoz kontakt ma’lumotlarini yangilang'
+                : 'Mijoz kontaktlari va birinchi avtomobil ma’lumotlarini kiriting'}
             </p>
 
             {error && (
@@ -318,7 +480,7 @@ export default function Customers() {
               </div>
             )}
 
-            <form onSubmit={handleCreateCustomer} className="space-y-4">
+            <form onSubmit={handleSaveCustomer} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1 font-[title]">
@@ -372,72 +534,138 @@ export default function Customers() {
                 />
               </div>
 
-              {/* Vehicle Subsection */}
-              <div
-                className={`p-3.5 rounded-xl border ${
-                  theme ? 'border-white/5 bg-white/5' : 'border-gray-200 bg-gray-50'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-primary mb-3 font-[title]">
-                  <Car size={15} />
-                  <span>Avtomobil Ma‘lumotlari (ixtiyoriy)</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <label className="block text-[11px] text-gray-400 mb-1">Davlat Raqami</label>
-                    <input
-                      value={plateNumber}
-                      onChange={(e) => setPlateNumber(e.target.value.toUpperCase())}
-                      placeholder="01 A 777 AA"
-                      className={`w-full px-3 py-2 rounded-lg border text-xs font-mono uppercase outline-none ${
-                        theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-gray-400 mb-1">
-                      Joriy Probeg (km)
-                    </label>
-                    <input
-                      type="number"
-                      value={odometerKm}
-                      onChange={(e) => setOdometerKm(e.target.value)}
-                      placeholder="85000"
-                      className={`w-full px-3 py-2 rounded-lg border text-xs outline-none ${
-                        theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white'
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] text-gray-400 mb-1">Marka</label>
-                    <input
-                      value={carMake}
-                      onChange={(e) => setCarMake(e.target.value)}
-                      placeholder="Chevrolet, Kia..."
-                      className={`w-full px-3 py-2 rounded-lg border text-xs outline-none ${
-                        theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-gray-400 mb-1">Model</label>
-                    <input
-                      value={carModel}
-                      onChange={(e) => setCarModel(e.target.value)}
-                      placeholder="Malibu, Cobalt..."
-                      className={`w-full px-3 py-2 rounded-lg border text-xs outline-none ${
-                        theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white'
-                      }`}
-                    />
-                  </div>
-                </div>
+              {/* Customer Photo Uploader moved to Modal */}
+              <div className="flex items-center gap-3">
+                {customerPhoto && (
+                  <img
+                    src={customerPhoto}
+                    alt="Mijoz rasmi ko‘rinishi"
+                    className="h-12 w-12 rounded-full object-cover"
+                  />
+                )}
+                <label className="grid gap-1 text-xs text-gray-400">
+                  Mijoz rasmi (ixtiyoriy)
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0]
+                      if (!file) return
+                      try {
+                        setCustomerPhoto(await fileToImageDataUrl(file))
+                      } catch (imageError) {
+                        setError(imageError.message)
+                      }
+                    }}
+                    className="max-w-full text-xs"
+                  />
+                </label>
               </div>
+
+              <label className="flex items-start gap-2.5 rounded-lg border border-border p-3 text-xs leading-5 text-text-muted">
+                <input
+                  type="checkbox"
+                  checked={smsConsent}
+                  onChange={(event) => setSmsConsent(event.target.checked)}
+                  className="mt-1 accent-emerald-600"
+                />
+                <span>
+                  Mijoz SMS eslatma va xabarlarini olishga roziligini aniq bildirdi. Rozilikni faqat
+                  mijoz tasdiqlagandan keyin belgilang.
+                </span>
+              </label>
+
+              {!editingCustomerId && (
+                <div
+                  className={`p-3.5 rounded-xl border ${
+                    theme ? 'border-white/5 bg-white/5' : 'border-gray-200 bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-primary mb-3 font-[title]">
+                    <Car size={15} />
+                    <span>Avtomobil Ma‘lumotlari (ixtiyoriy)</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-[11px] text-gray-400 mb-1">Davlat Raqami</label>
+                      <input
+                        value={plateNumber}
+                        onChange={(e) => setPlateNumber(e.target.value.toUpperCase())}
+                        placeholder="01 A 777 AA"
+                        className={`w-full px-3 py-2 rounded-lg border text-xs font-mono uppercase outline-none ${
+                          theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] text-gray-400 mb-1">
+                        Joriy Probeg (km)
+                      </label>
+                      <input
+                        type="number"
+                        value={odometerKm}
+                        onChange={(e) => setOdometerKm(e.target.value)}
+                        placeholder="85000"
+                        className={`w-full px-3 py-2 rounded-lg border text-xs outline-none ${
+                          theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-gray-400 mb-1">Marka</label>
+                      <input
+                        value={carMake}
+                        onChange={(e) => setCarMake(e.target.value)}
+                        placeholder="Chevrolet, Kia..."
+                        className={`w-full px-3 py-2 rounded-lg border text-xs outline-none ${
+                          theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] text-gray-400 mb-1">Model</label>
+                      <input
+                        value={carModel}
+                        onChange={(e) => setCarModel(e.target.value)}
+                        placeholder="Malibu, Cobalt..."
+                        className={`w-full px-3 py-2 rounded-lg border text-xs outline-none ${
+                          theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                  <label className="mt-3 grid gap-1 text-[11px] text-gray-400">
+                    Avtomobil rasmi (ixtiyoriy)
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0]
+                        if (!file) return
+                        try {
+                          setVehiclePhoto(await fileToImageDataUrl(file))
+                        } catch (imageError) {
+                          setError(imageError.message)
+                        }
+                      }}
+                      className="max-w-full text-xs"
+                    />
+                  </label>
+                  {vehiclePhoto && (
+                    <img
+                      src={vehiclePhoto}
+                      alt="Avtomobil rasmi ko‘rinishi"
+                      className="mt-2 h-20 w-32 rounded-md object-cover"
+                    />
+                  )}
+                </div>
+              )}
 
               <div className="pt-2 flex items-center justify-end gap-3">
                 <button
@@ -462,7 +690,7 @@ export default function Customers() {
                       <span>Saqlanmoqda...</span>
                     </>
                   ) : (
-                    <span>Mijozni Saqlash</span>
+                    <span>{editingCustomerId ? 'O‘zgarishlarni saqlash' : 'Mijozni Saqlash'}</span>
                   )}
                 </button>
               </div>

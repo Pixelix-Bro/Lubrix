@@ -1,42 +1,28 @@
 import {
-  AlertCircle,
-  AlertTriangle,
   Battery,
-  Calendar,
-  Car,
-  CheckCircle2,
   CircleGauge,
   ClipboardCheck,
   Disc,
   Droplet,
-  Eye,
-  FileText,
-  Gauge,
-  Loader2,
   Printer,
   Save,
-  Send,
-  ShieldAlert,
   ShieldCheck,
-  Sparkles,
   ThermometerSnowflake,
-  User,
   Wind,
-  XCircle,
-} from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
-import { lubrixApi } from '../services/api';
+} from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
+import { lubrixApi } from '../services/api'
 
 export default function InspectionChecklist() {
-  const theme = useSelector((state) => state.themes.theme);
+  const theme = useSelector((state) => state.themes.theme)
 
-  const [customers, setCustomers] = useState([]);
-  const [vehicles, setVehicles] = useState([]);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [selectedVehicle, setSelectedVehicle] = useState(null);
-  const [odometerKm, setOdometerKm] = useState('78000');
-  const [savedSuccess, setSavedSuccess] = useState(false);
+  const [customers, setCustomers] = useState([])
+  const [vehicles, setVehicles] = useState([])
+  const [selectedCustomer, setSelectedCustomer] = useState(null)
+  const [selectedVehicle, setSelectedVehicle] = useState(null)
+  const [odometerKm, setOdometerKm] = useState('78000')
+  const [savedSuccess, setSavedSuccess] = useState(false)
 
   // 15-Point Inspection Points
   const [checklist, setChecklist] = useState({
@@ -55,58 +41,25 @@ export default function InspectionChecklist() {
     beltCondition: 'OK',
     brakePadsFront: '60% qolgan',
     brakePadsRear: '70% qolgan',
-  });
+  })
 
   const [technicianNotes, setTechnicianNotes] = useState(
     'Moy va filtrlar to‘liq almashtirildi. Keyingi tekshiruvda tormoz kolodkalarini almashtirish tavsiya etiladi.'
-  );
+  )
 
   useEffect(() => {
-    Promise.all([lubrixApi.getCustomers(), lubrixApi.getVehicles()]).then(
-      ([cRes, vRes]) => {
-        setCustomers(cRes.data?.data || []);
-        setVehicles(vRes.data?.data || []);
-        if (cRes.data?.data?.length > 0) setSelectedCustomer(cRes.data.data[0]);
-        if (vRes.data?.data?.length > 0) setSelectedVehicle(vRes.data.data[0]);
-      }
-    );
-  }, []);
+    Promise.all([lubrixApi.getCustomers(), lubrixApi.getVehicles()]).then(([cRes, vRes]) => {
+      setCustomers(cRes.data?.data || [])
+      setVehicles(vRes.data?.data || [])
+      if (cRes.data?.data?.length > 0) setSelectedCustomer(cRes.data.data[0])
+      if (vRes.data?.data?.length > 0) setSelectedVehicle(vRes.data.data[0])
+    })
+  }, [])
 
   const handleSaveInspection = () => {
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'OK':
-      case 'CLEAN':
-      case 'NONE':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <CheckCircle2 size={12} />
-            <span>A'lo (Normada)</span>
-          </span>
-        );
-      case 'REPLACE':
-      case 'DIRTY':
-      case 'WARN':
-      case 'SWEATING':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <AlertTriangle size={12} />
-            <span>Almashtirish tavsiya</span>
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
-            <XCircle size={12} />
-            <span>Kritik holat</span>
-          </span>
-        );
-    }
-  };
+    setSavedSuccess(true)
+    setTimeout(() => setSavedSuccess(false), 3000)
+  }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -118,7 +71,8 @@ export default function InspectionChecklist() {
             <span>Avtomobil 15 Nuqtali Ko‘rik Varaqasi</span>
           </h1>
           <p className="text-xs sm:text-sm text-gray-400 mt-1">
-            Moy almashtirish jarayonida avtomobil xavfsizlik nuqtalarini tekshirish va mijozga rasmiy xulosa berish
+            Moy almashtirish jarayonida avtomobil xavfsizlik nuqtalarini tekshirish va mijozga
+            rasmiy xulosa berish
           </p>
         </div>
 
@@ -158,8 +112,8 @@ export default function InspectionChecklist() {
           <select
             value={selectedCustomer?._id || selectedCustomer?.id || ''}
             onChange={(e) => {
-              const found = customers.find((c) => (c._id || c.id) === e.target.value);
-              setSelectedCustomer(found);
+              const found = customers.find((c) => (c._id || c.id) === e.target.value)
+              setSelectedCustomer(found)
             }}
             className={`w-full px-3.5 py-2.5 rounded-xl border text-xs outline-none ${
               theme ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'
@@ -180,8 +134,8 @@ export default function InspectionChecklist() {
           <select
             value={selectedVehicle?._id || selectedVehicle?.id || ''}
             onChange={(e) => {
-              const found = vehicles.find((v) => (v._id || v.id) === e.target.value);
-              setSelectedVehicle(found);
+              const found = vehicles.find((v) => (v._id || v.id) === e.target.value)
+              setSelectedVehicle(found)
             }}
             className={`w-full px-3.5 py-2.5 rounded-xl border text-xs outline-none ${
               theme ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'
@@ -402,5 +356,5 @@ export default function InspectionChecklist() {
         </div>
       </div>
     </div>
-  );
+  )
 }

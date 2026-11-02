@@ -1,40 +1,63 @@
-import jwt from 'jsonwebtoken'
+import { authenticateAccessToken, isValidCsrfRequest } from '../modules/auth/authSession.js'
+import { readCookie } from '../utils/authCookies.js'
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'lubrix-dev-secret-change-in-production'
+const DEVELOPMENT_JWT_SECRET = 'lubrix-dev-secret-change-in-production'
 
-export const requireAuth = (req, res, next) => {
-  const authHeader = req.headers.authorization
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      success: false,
-      error: 'Unauthorized: Autentifikatsiya talab qilinadi. Token taqdim etilmagan.',
-      requestId: req.headers['x-request-id'] || `req-${Date.now()}`,
-    })
+export const getJwtSecret = (env = process.env) => {
+  const secret = env.JWT_SECRET?.trim()
+  if (!secret) {
+    if (env.NODE_ENV === 'production') {
+      throw new Error('Production muhitida JWT_SECRET sozlanishi shart')
+    }
+    return DEVELOPMENT_JWT_SECRET
   }
 
-  const token = authHeader.split(' ')[1]
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET)
-    req.user = decoded
-    req.userId = decoded.userId || decoded.id
-    req.organizationId = decoded.organizationId // Enforces tenant isolation
-    req.role = decoded.role
+  if (env.NODE_ENV === 'production' && Buffer.byteLength(secret) < 32) {
+    throw new Error('Production JWT_SECRET kamida 32 bayt bo‘lishi shart')
+  }
 
-    if (!req.organizationId) {
+  return secret
+}
+
+export const JWT_SECRET = getJwtSecret()
+
+export const requireAuth = async (req, res, next) => {
+  try {
+    const auth = await authenticateAccessToken(readCookie(req, 'lubrix_access'))
+    if (!auth) {
       return res.status(401).json({
         success: false,
-        error: 'Unauthorized: Token tarkibida tashkilot identifikatori mavjud emas',
+        error: 'Sessiya tugagan yoki yaroqsiz. Qayta kiring.',
+        requestId: req.headers['x-request-id'] || `req-${Date.now()}`,
       })
     }
 
-    next()
-  } catch {
-    return res.status(401).json({
-      success: false,
-      error: 'Unauthorized: Noto‘g‘ri yoki muddati o‘tgan sessiya tokeni',
-      requestId: req.headers['x-request-id'] || `req-${Date.now()}`,
-    })
+    req.user = {
+      userId: auth.user._id.toString(),
+      id: auth.user._id.toString(),
+      organizationId: auth.user.organizationId,
+      role: auth.user.role,
+      name: auth.user.name,
+      branchId: auth.user.branchId,
+    }
+    req.userId = req.user.userId
+    req.organizationId = auth.session.organizationId
+    req.role = auth.user.role
+    req.authSession = auth.session
+
+    if (
+      ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) &&
+      !isValidCsrfRequest(req, auth.session)
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: 'CSRF tekshiruvi o‘tmadi. Sahifani yangilab qayta urinib ko‘ring.',
+      })
+    }
+
+    return next()
+  } catch (error) {
+    return next(error)
   }
 }
 

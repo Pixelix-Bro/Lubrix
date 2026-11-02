@@ -5,29 +5,17 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'
 class LubrixSocketService {
   constructor() {
     this.socket = null
-    this.tenantId = 'org-lubrix-01'
   }
 
-  setTenant(tenantId) {
-    if (tenantId) {
-      this.tenantId = tenantId
-      if (this.socket && this.socket.connected) {
-        this.socket.emit('join_tenant', tenantId)
-      }
-    }
+  setTenant() {
+    return this.connect()
   }
 
-  connect(tenantId = null) {
-    if (tenantId) this.tenantId = tenantId
+  connect() {
     if (!this.socket) {
       this.socket = io(SOCKET_URL, {
+        withCredentials: true,
         transports: ['websocket', 'polling'],
-      })
-
-      this.socket.on('connect', () => {
-        if (this.tenantId) {
-          this.socket.emit('join_tenant', this.tenantId)
-        }
       })
 
       this.socket.on('disconnect', () => {
@@ -38,16 +26,21 @@ class LubrixSocketService {
   }
 
   subscribe(event, callback) {
-    if (!this.socket) this.connect()
-    this.socket.on(event, callback)
+    const socket = this.connect()
+    if (!socket) return () => {}
+    socket.on(event, callback)
     return () => {
-      this.socket.off(event, callback)
+      socket.off(event, callback)
     }
   }
 
   emit(event, data) {
-    if (!this.socket) this.connect()
-    this.socket.emit(event, data)
+    this.connect()?.emit(event, data)
+  }
+
+  disconnect() {
+    this.socket?.disconnect()
+    this.socket = null
   }
 }
 

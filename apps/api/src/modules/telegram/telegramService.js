@@ -6,7 +6,21 @@ import {
   TelegramCommand,
   TelegramIntegration,
 } from '../../models/index.js'
-import { DEFAULT_BOT_COMMANDS } from './commandTemplates.js'
+import { DEFAULT_BOT_COMMANDS, DEFAULT_BOT_COMMANDS_VERSION } from './commandTemplates.js'
+import { TelegramFlowEngine } from './flowEngine.js'
+
+const defaultCommandInitialization = new Map()
+const TELEGRAM_NETWORK_ERROR_CODES = new Set([
+  'EAI_AGAIN',
+  'ENOTFOUND',
+  'ECONNABORTED',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'ERR_NETWORK',
+])
 
 function formatMoney(n) {
   return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
@@ -26,11 +40,12 @@ export class TelegramService {
       }
       return { valid: false, error: 'Telegram javob bermadi' }
     } catch (err) {
-      const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout')
+      const isNetworkError =
+        TELEGRAM_NETWORK_ERROR_CODES.has(err.code) || err.message?.toLowerCase().includes('timeout')
       return {
         valid: false,
-        error: isTimeout
-          ? 'Telegram serveri bilan aloqa o‘rnatib bo‘lmadi (internet ulanishini tekshiring)'
+        error: isNetworkError
+          ? 'Telegram API bilan aloqa yo‘q. DNS, internet yoki firewall ulanishini tekshiring.'
           : err.response?.data?.description || 'Noto‘g‘ri yoki faol bo‘lmagan bot token',
       }
     }
@@ -49,11 +64,59 @@ export class TelegramService {
     return res.data
   }
 
+  static async deleteWebhook(botToken) {
+    await axios.post(
+      `https://api.telegram.org/bot${botToken}/deleteWebhook`,
+      { drop_pending_updates: false },
+      { timeout: 8000 }
+    )
+  }
+
   static async ensureDefaultCommands(organizationId) {
-    const count = await TelegramCommand.countDocuments({ organizationId })
-    if (count > 0) return
-    await TelegramCommand.insertMany(
-      DEFAULT_BOT_COMMANDS.map((c) => ({ ...c, organizationId, isActive: true }))
+    const key = String(organizationId)
+    const existingInitialization = defaultCommandInitialization.get(key)
+    if (existingInitialization) return existingInitialization
+
+    const initialization = (async () => {
+      for (const command of DEFAULT_BOT_COMMANDS) {
+        const current = await TelegramCommand.findOne({ organizationId, command: command.command })
+        if (!current) {
+          await TelegramCommand.create({ ...command, organizationId, isActive: true })
+        }
+      }
+      await TelegramIntegration.updateOne(
+        { organizationId, defaultCommandsVersion: { $lt: DEFAULT_BOT_COMMANDS_VERSION } },
+        { $set: { defaultCommandsVersion: DEFAULT_BOT_COMMANDS_VERSION } }
+      )
+    })()
+
+    defaultCommandInitialization.set(key, initialization)
+    try {
+      await initialization
+    } catch (error) {
+      if (defaultCommandInitialization.get(key) === initialization) {
+        defaultCommandInitialization.delete(key)
+      }
+      throw error
+    }
+  }
+
+  static async syncBotCommands(organizationId, botToken) {
+    const commands = await TelegramCommand.find({ organizationId, isActive: true }).sort({
+      createdAt: 1,
+    })
+    await axios.post(
+      `https://api.telegram.org/bot${botToken}/setMyCommands`,
+      {
+        commands: commands.map((command) => ({
+          command: command.command.replace(/^\//, ''),
+          description: String(command.title || command.description || command.command).slice(
+            0,
+            256
+          ),
+        })),
+      },
+      { timeout: 8000 }
     )
   }
 
@@ -75,12 +138,11 @@ export class TelegramService {
     const productText =
       products.length === 0
         ? 'Mahsulotlar hali qo‘shilmagan.'
-        : products
-            .map((p) => `• ${p.brand} ${p.name} — ${formatMoney(p.price)} UZS`)
-            .join('\n')
+        : products.map((p) => `• ${p.brand} ${p.name} — ${formatMoney(p.price)} UZS`).join('\n')
 
     return String(template || '')
       .replaceAll('{{org_name}}', org?.name || 'Servis')
+      .replaceAll('{business_name}', org?.name || 'Servis')
       .replaceAll('{{org_phone}}', org?.phone || '—')
       .replaceAll('{{org_address}}', org?.address || '—')
       .replaceAll('{{org_email}}', org?.email || '—')
@@ -91,35 +153,9 @@ export class TelegramService {
   static async handleWebhookUpdate(organizationId, update) {
     const integration = await TelegramIntegration.findOne({ organizationId, isActive: true })
     if (!integration) return
-
-    const message = update.message
-    if (!message || !message.text) return
-
-    const chatId = message.chat.id
-    const text = message.text.trim()
-    const commandKey = text.split(/\s+/)[0].split('@')[0].toLowerCase()
-
     await this.ensureDefaultCommands(organizationId)
     const commands = await TelegramCommand.find({ organizationId, isActive: true })
-    const matched = commands.find((c) => c.command.toLowerCase() === commandKey)
-
-    if (matched) {
-      const body = await this.renderTemplate(organizationId, matched.responseTemplate)
-      await this.sendMessage({
-        botToken: integration.botToken,
-        chatId,
-        text: body,
-        parseMode: undefined,
-      })
-      return
-    }
-
-    await this.sendMessage({
-      botToken: integration.botToken,
-      chatId,
-      text: 'Buyruq topilmadi. /start yuboring yoki sozlamalarda buyruqlarni tekshiring.',
-      parseMode: undefined,
-    })
+    await TelegramFlowEngine.handle(organizationId, integration, update, commands)
   }
 
   static async notifyOwner(organizationId, eventType, data) {
@@ -135,6 +171,8 @@ export class TelegramService {
         msg = `Xizmat yakunlandi\nMijoz: ${data.customerName}\nAvto: ${data.vehicle || ''} (${data.plate || ''})\nSumma: ${formatMoney(data.price)} UZS`
       } else if (eventType === 'lowStock') {
         msg = `Ombor qoldig‘i kam\nMahsulot: ${data.productName}\nQoldiq: ${data.quantity}`
+      } else if (eventType === 'newCustomer') {
+        msg = `Yangi mijoz qo‘shildi\nMijoz: ${data.customerName}\nTel: ${data.customerPhone || '—'}`
       } else if (eventType === 'planExpiry') {
         msg = `Obuna tugashiga ${data.daysLeft} kun qoldi.`
       }

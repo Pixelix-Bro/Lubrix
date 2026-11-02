@@ -11,9 +11,9 @@ import {
   ShieldCheck,
   ShoppingBag,
   Trash2,
-  User,
   Zap,
 } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
@@ -22,15 +22,11 @@ import VoiceField from '../components/ui/VoiceField'
 import { lubrixApi } from '../services/api'
 import { formatMoney } from '../utils/formatNumber'
 
-function qrSvg(payload) {
-  const encoded = encodeURIComponent(payload)
-  return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encoded}`
-}
-
 export default function QuickPOS() {
   const theme = useSelector((state) => state.themes.theme)
   const org = useSelector((state) => state.auth?.user)
 
+  const [organizationSettings, setOrganizationSettings] = useState(null)
   const [products, setProducts] = useState([])
   const [customers, setCustomers] = useState([])
   const [vehicles, setVehicles] = useState([])
@@ -56,17 +52,18 @@ export default function QuickPOS() {
 
   const loadData = async () => {
     try {
-      setLoading(true)
-      const [prodRes, custRes, vehRes, cardRes] = await Promise.all([
+      const [prodRes, custRes, vehRes, cardRes, settingsRes] = await Promise.all([
         lubrixApi.getProducts(),
         lubrixApi.getCustomers(),
         lubrixApi.getVehicles(),
         lubrixApi.getPaymentCards().catch(() => ({ data: { data: [] } })),
+        lubrixApi.getSettings().catch(() => ({ data: { data: {} } })),
       ])
       setProducts(prodRes.data?.data || [])
       setCustomers(custRes.data?.data || [])
       setVehicles(vehRes.data?.data || [])
       setCards(cardRes.data?.data || [])
+      setOrganizationSettings(settingsRes.data?.data?.organization || null)
     } catch (err) {
       console.error('POS load error:', err)
     } finally {
@@ -75,7 +72,8 @@ export default function QuickPOS() {
   }
 
   useEffect(() => {
-    loadData()
+    const timer = window.setTimeout(loadData, 0)
+    return () => window.clearTimeout(timer)
   }, [])
 
   const addToCart = (product, customQty = 1) => {
@@ -84,7 +82,9 @@ export default function QuickPOS() {
       const existing = prev.find((item) => (item._id || item.id) === id)
       if (existing) {
         return prev.map((item) =>
-          (item._id || item.id) === id ? { ...item, qty: Number((item.qty + customQty).toFixed(1)) } : item
+          (item._id || item.id) === id
+            ? { ...item, qty: Number((item.qty + customQty).toFixed(1)) }
+            : item
         )
       }
       return [...prev, { ...product, qty: customQty, price: Number(product.price) || 0 }]
@@ -105,7 +105,8 @@ export default function QuickPOS() {
     )
   }
 
-  const removeFromCart = (id) => setCart((prev) => prev.filter((item) => (item._id || item.id) !== id))
+  const removeFromCart = (id) =>
+    setCart((prev) => prev.filter((item) => (item._id || item.id) !== id))
 
   const totalAmount = cart.reduce((acc, item) => acc + item.qty * item.price, 0)
 
@@ -119,11 +120,13 @@ export default function QuickPOS() {
     const q = productSearch.trim().toLowerCase()
     const matchQ =
       !q ||
-      [p.name, p.brand, p.viscosity, p.barcode].some((f) => String(f || '').toLowerCase().includes(q))
+      [p.name, p.brand, p.viscosity, p.barcode].some((f) =>
+        String(f || '')
+          .toLowerCase()
+          .includes(q)
+      )
     const matchCat =
-      productCategory === 'ALL' ||
-      p.oilType === productCategory ||
-      p.category === productCategory
+      productCategory === 'ALL' || p.oilType === productCategory || p.category === productCategory
     return matchQ && matchCat
   })
 
@@ -162,7 +165,11 @@ export default function QuickPOS() {
       toast.error('Mijozni tanlang yoki bir martalik rejimni yoqing')
       return
     }
-    if (paymentMethod !== 'CASH' && cards.length === 0 && ['UZCARD', 'HUMO'].includes(paymentMethod)) {
+    if (
+      paymentMethod !== 'CASH' &&
+      cards.length === 0 &&
+      ['UZCARD', 'HUMO'].includes(paymentMethod)
+    ) {
       toast.error('Avval sozlamalarda qabul qiluvchi kartani ulang')
       return
     }
@@ -232,7 +239,9 @@ export default function QuickPOS() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-7 space-y-4">
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white'}`}>
+          <div
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${theme ? 'border-white/10 bg-surface' : 'border-gray-200 bg-white'}`}
+          >
             <VoiceField
               value={productSearch}
               onChange={setProductSearch}
@@ -304,7 +313,22 @@ export default function QuickPOS() {
             {checkoutComplete ? (
               <div className="space-y-4 print:text-black" id="pos-receipt">
                 <div className="text-center space-y-1 border-b border-dashed pb-4">
-                  <p className="text-sm font-bold">{org?.organizationName || org?.name || 'Servis'}</p>
+                  {organizationSettings?.logoUrl && (
+                    <img
+                      src={organizationSettings.logoUrl}
+                      alt="Servis logotipi"
+                      className="mx-auto mb-2 h-12 max-w-36 object-contain"
+                    />
+                  )}
+                  <p className="text-sm font-bold">
+                    {organizationSettings?.name || org?.organizationName || org?.name || 'Servis'}
+                  </p>
+                  {organizationSettings?.phone && (
+                    <p className="text-[11px]">{organizationSettings.phone}</p>
+                  )}
+                  {organizationSettings?.address && (
+                    <p className="text-[10px]">{organizationSettings.address}</p>
+                  )}
                   <p className="text-[11px] text-gray-400">Sotuv cheki</p>
                   <p className="font-mono text-xs">{receiptNo}</p>
                   {invoiceNo && <p className="font-mono text-[11px] text-gray-400">{invoiceNo}</p>}
@@ -339,7 +363,9 @@ export default function QuickPOS() {
                 </div>
                 {receiptNo && (
                   <div className="flex justify-center pt-2">
-                    <img src={qrSvg(`CHEK:${receiptNo}`)} alt="Chek QR" className="w-28 h-28 bg-white rounded" />
+                    <div className="rounded bg-white p-2">
+                      <QRCodeSVG value={`CHEK:${receiptNo}`} size={112} aria-label="Chek QR" />
+                    </div>
                   </div>
                 )}
                 <div className="flex items-center justify-center gap-3 pt-2 print:hidden">
@@ -365,7 +391,8 @@ export default function QuickPOS() {
                   <h3 className="text-sm font-bold">Karta / QR to‘lovi kutilmoqda</h3>
                 </div>
                 <p className="text-xs text-gray-400">
-                  To‘lov hali tasdiqlanmagan. Mijoz kartadan yoki QR orqali to‘lagach, tasdiqlang. Chek faqat shundan keyin chiqadi.
+                  To‘lov hali tasdiqlanmagan. Mijoz kartadan yoki QR orqali to‘lagach, tasdiqlang.
+                  Chek faqat shundan keyin chiqadi.
                 </p>
                 <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs space-y-1">
                   <p className="flex items-center gap-1.5">
@@ -373,14 +400,24 @@ export default function QuickPOS() {
                   </p>
                   <p>Summa: {formatMoney(totalAmount)}</p>
                   <p>Tranzaksiya: {pendingPay.transaction?.merchantTransactionId}</p>
-                  {cards[0] && <p>Qabul qiluvchi: {cards[0].cardNumberMasked} ({cards[0].cardType})</p>}
+                  {cards[0] && (
+                    <p>
+                      Qabul qiluvchi: {cards[0].cardNumberMasked} ({cards[0].cardType})
+                    </p>
+                  )}
                 </div>
                 <div className="flex justify-center">
-                  <img
-                    src={qrSvg(pendingPay.qrPayload || pendingPay.paymentUrl || `pay:${pendingPay.transaction?._id}`)}
-                    alt="To‘lov QR"
-                    className="w-40 h-40 bg-white rounded-xl p-2"
-                  />
+                  <div className="rounded-xl bg-white p-2">
+                    <QRCodeSVG
+                      value={
+                        pendingPay.qrPayload ||
+                        pendingPay.paymentUrl ||
+                        `pay:${pendingPay.transaction?._id}`
+                      }
+                      size={160}
+                      aria-label="To‘lov QR"
+                    />
+                  </div>
                 </div>
                 <input
                   value={cardLastFour}
@@ -395,7 +432,10 @@ export default function QuickPOS() {
                 >
                   {isSubmitting ? 'Tasdiqlanmoqda...' : 'To‘lov keldi, chek chiqarish'}
                 </button>
-                <button onClick={() => setPendingPay(null)} className="w-full text-xs text-gray-400">
+                <button
+                  onClick={() => setPendingPay(null)}
+                  className="w-full text-xs text-gray-400"
+                >
                   Ortga
                 </button>
               </div>
@@ -415,7 +455,9 @@ export default function QuickPOS() {
                     type="button"
                     onClick={() => setGuestMode(true)}
                     className={`py-2 rounded-xl text-xs font-semibold border ${
-                      guestMode ? 'border-primary bg-primary/10 text-primary' : 'border-inherit text-gray-400'
+                      guestMode
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-inherit text-gray-400'
                     }`}
                   >
                     Bir martalik
@@ -424,7 +466,9 @@ export default function QuickPOS() {
                     type="button"
                     onClick={() => setGuestMode(false)}
                     className={`py-2 rounded-xl text-xs font-semibold border ${
-                      !guestMode ? 'border-primary bg-primary/10 text-primary' : 'border-inherit text-gray-400'
+                      !guestMode
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-inherit text-gray-400'
                     }`}
                   >
                     Doimiy mijoz
@@ -457,7 +501,9 @@ export default function QuickPOS() {
                     <select
                       value={selectedCustomer?._id || selectedCustomer?.id || ''}
                       onChange={(e) => {
-                        const found = customers.find((c) => String(c._id || c.id) === e.target.value)
+                        const found = customers.find(
+                          (c) => String(c._id || c.id) === e.target.value
+                        )
                         setSelectedCustomer(found || null)
                         setSelectedVehicle(null)
                       }}
@@ -473,7 +519,9 @@ export default function QuickPOS() {
                     <select
                       value={selectedVehicle?._id || selectedVehicle?.id || ''}
                       onChange={(e) => {
-                        const found = customerVehicles.find((v) => String(v._id || v.id) === e.target.value)
+                        const found = customerVehicles.find(
+                          (v) => String(v._id || v.id) === e.target.value
+                        )
                         setSelectedVehicle(found || null)
                       }}
                       className={`w-full px-3 py-2 rounded-xl border text-xs ${theme ? 'border-white/10 bg-white/5' : 'border-gray-200'}`}
@@ -513,14 +561,26 @@ export default function QuickPOS() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <button type="button" onClick={() => updateQty(item._id || item.id, -1)} className="p-1 rounded bg-white/10">
+                          <button
+                            type="button"
+                            onClick={() => updateQty(item._id || item.id, -1)}
+                            className="p-1 rounded bg-white/10"
+                          >
                             <Minus size={12} />
                           </button>
                           <span className="font-mono">{item.qty}</span>
-                          <button type="button" onClick={() => updateQty(item._id || item.id, 1)} className="p-1 rounded bg-white/10">
+                          <button
+                            type="button"
+                            onClick={() => updateQty(item._id || item.id, 1)}
+                            className="p-1 rounded bg-white/10"
+                          >
                             <Plus size={12} />
                           </button>
-                          <button type="button" onClick={() => removeFromCart(item._id || item.id)} className="p-1 text-red-400">
+                          <button
+                            type="button"
+                            onClick={() => removeFromCart(item._id || item.id)}
+                            className="p-1 text-red-400"
+                          >
                             <Trash2 size={12} />
                           </button>
                         </div>
@@ -565,7 +625,11 @@ export default function QuickPOS() {
                   disabled={!cart.length || isSubmitting}
                   className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-emerald-600 text-white font-bold text-sm disabled:opacity-50"
                 >
-                  {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                  {isSubmitting ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={18} />
+                  )}
                   {paymentMethod === 'CASH' ? 'Naqd qabul qilish' : 'Kartaga / QR ga o‘tkazish'}
                 </button>
               </>
