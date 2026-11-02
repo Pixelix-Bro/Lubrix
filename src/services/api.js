@@ -93,6 +93,24 @@ apiClient.interceptors.response.use(
     const config = error.config
     const url = String(config?.url || '')
     if (
+      error.response?.status === 403 &&
+      String(error.response.data?.error || '')
+        .toLowerCase()
+        .includes('csrf') &&
+      config &&
+      !config._csrfRetry
+    ) {
+      config._csrfRetry = true
+      csrfTokenMemory = ''
+      return apiClient.get('/auth/csrf').then((response) => {
+        const csrfToken = response.data?.csrfToken
+        if (!csrfToken) return Promise.reject(error)
+        csrfTokenMemory = csrfToken
+        config.headers['X-CSRF-Token'] = csrfToken
+        return apiClient(config)
+      })
+    }
+    if (
       error.response?.status === 401 &&
       config &&
       !config._authRetry &&
