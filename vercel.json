@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/v1/(.*)",
+      "destination": "https://lubrix-backend.vercel.app/api/v1/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
     }
