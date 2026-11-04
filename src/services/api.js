@@ -1,7 +1,9 @@
 import axios from 'axios'
 
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
+
 export const API_BASE_URL = String(
-  import.meta.env.PROD ? '/api/v1' : import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'
+  configuredApiUrl || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:5000/api/v1')
 )
   .trim()
   .replace(/([^:]\/)\/+/g, '$1')
