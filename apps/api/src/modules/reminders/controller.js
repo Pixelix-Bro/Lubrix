@@ -1,99 +1,116 @@
-import { Reminder, Customer, MessageLog, Organization } from '../../models/index.js';
-import { getSmsProvider } from '../notifications/smsAdapter.js';
-import { emitTenantEvent } from '../../realtime/socket.js';
+import { Customer, MessageLog, Organization, Reminder } from '../../models/index.js'
+import { emitTenantEvent } from '../../realtime/socket.js'
+import { getSmsProvider } from '../notifications/smsAdapter.js'
 
 export const getReminders = async (req, res, next) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 20));
-    const skip = (page - 1) * limit;
-    const { status, vehicleId, customerId } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1)
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 20))
+    const skip = (page - 1) * limit
+    const { status, vehicleId, customerId } = req.query
 
-    const filter = { organizationId: req.organizationId };
-    if (status) filter.status = status;
-    if (vehicleId) filter.vehicleId = vehicleId;
-    if (customerId) filter.customerId = customerId;
+    const filter = { organizationId: req.organizationId }
+    if (status) filter.status = status
+    if (vehicleId) filter.vehicleId = vehicleId
+    if (customerId) filter.customerId = customerId
 
     const [total, reminders] = await Promise.all([
       Reminder.countDocuments(filter),
-      Reminder.find(filter).sort({ dueAt: 1 }).skip(skip).limit(limit)
-    ]);
+      Reminder.find(filter).sort({ dueAt: 1 }).skip(skip).limit(limit),
+    ])
 
     res.json({
       success: true,
       data: reminders,
       total,
       page,
-      limit
-    });
+      limit,
+    })
   } catch (err) {
-    next(err);
+    next(err)
   }
-};
+}
 
 export const getReminderById = async (req, res, next) => {
   try {
     const reminder = await Reminder.findOne({
       _id: req.params.id,
-      organizationId: req.organizationId
-    });
+      organizationId: req.organizationId,
+    })
 
     if (!reminder) {
       return res.status(404).json({
         success: false,
-        error: 'Eslatma topilmadi'
-      });
+        error: 'Eslatma topilmadi',
+      })
     }
 
     res.json({
       success: true,
-      data: reminder
-    });
+      data: reminder,
+    })
   } catch (err) {
-    next(err);
+    next(err)
   }
-};
+}
 
 export const sendReminder = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params
     const reminder = await Reminder.findOne({
       _id: id,
-      organizationId: req.organizationId
-    });
+      organizationId: req.organizationId,
+    })
 
     if (!reminder) {
       return res.status(404).json({
         success: false,
-        error: 'Eslatma topilmadi'
-      });
+        error: 'Eslatma topilmadi',
+      })
     }
 
     const [customer, org] = await Promise.all([
       Customer.findOne({ _id: reminder.customerId, organizationId: req.organizationId }),
-      Organization.findById(req.organizationId)
-    ]);
+      Organization.findById(req.organizationId),
+    ])
 
-    const recipientPhone = customer?.phoneE164 || '+998901234567';
-    const customerName = customer?.fullName || reminder.customerName || 'Hurmatli mijoz';
-    const vehicleLabel = reminder.vehicleLabel || 'Avtomobilingiz';
-    const orgName = org?.name || 'Lubrix Servis';
+    if (!customer) {
+      return res.status(404).json({ success: false, error: 'Eslatma uchun mijoz topilmadi' })
+    }
+    if (!customer.phoneE164) {
+      return res
+        .status(422)
+        .json({ success: false, error: 'Mijozning баталгаажсан утасны дугаар алга' })
+    }
+    if (!customer.smsConsentAt || !customer.smsConsentSource || customer.optedOutAt) {
+      return res
+        .status(403)
+        .json({ success: false, error: 'Mijoz SMS хүлээн авах зөвшөөрөл өгөөгүй' })
+    }
+    if (!org) {
+      return res.status(404).json({ success: false, error: 'Tashkilot topilmadi' })
+    }
 
-    const smsProvider = getSmsProvider();
-    const smsText = `Lubrix: Assalomu alaykum ${customerName}! ${vehicleLabel} uchun moy almashtirish vaqti yaqinlashmoqda. Manzil: ${orgName}`;
+    const recipientPhone = customer.phoneE164
+    const customerName = customer.fullName
+    const vehicleLabel = reminder.vehicleLabel || 'Avtomobilingiz'
+    const orgName = org.name
+
+    const smsProvider = getSmsProvider()
+    const smsText = `Lubrix: Assalomu alaykum ${customerName}! ${vehicleLabel} uchun moy almashtirish vaqti yaqinlashmoqda. Manzil: ${orgName}`
 
     const sendResult = await smsProvider.sendSms({
       to: recipientPhone,
       message: smsText,
-      organizationId: req.organizationId
-    });
+      organizationId: req.organizationId,
+    })
 
-    reminder.status = sendResult.success ? 'sent' : 'failed';
-    reminder.attempts += 1;
+    reminder.status = sendResult.success ? 'sent' : 'failed'
+    reminder.attempts += 1
     if (sendResult.error) {
-      reminder.lastError = sendResult.error;
+      reminder.lastError = sendResult.error
     }
-    await reminder.save();
+    await reminder.save()
 
     const logEntry = await MessageLog.create({
       organizationId: req.organizationId,
@@ -101,77 +118,78 @@ export const sendReminder = async (req, res, next) => {
       customerName,
       phone: recipientPhone,
       channel: reminder.channel || 'SMS',
-      provider: process.env.SMS_PROVIDER || 'mock',
-      providerMessageId: sendResult.providerMessageId || `mock-${Date.now()}`,
+      provider: smsProvider.name,
+      providerMessageId: sendResult.providerMessageId,
       status: reminder.status,
-      cost: sendResult.cost || 0.005,
-      sentAt: new Date()
-    });
+      cost: sendResult.cost,
+      sentAt: new Date(),
+    })
 
-    emitTenantEvent(req.organizationId, 'reminder:sent', { reminder, log: logEntry });
+    emitTenantEvent(req.organizationId, 'reminder:sent', { reminder, log: logEntry })
 
-    res.json({
-      success: true,
+    res.status(sendResult.success ? 200 : 502).json({
+      success: Boolean(sendResult.success),
+      ...(sendResult.success ? {} : { error: sendResult.error || 'SMS yuborilmadi' }),
       data: {
         reminder,
-        log: logEntry
-      }
-    });
+        log: logEntry,
+      },
+    })
   } catch (err) {
-    next(err);
+    next(err)
   }
-};
+}
 
 export const updateReminder = async (req, res, next) => {
   try {
-    const updates = { ...req.body };
-    delete updates.organizationId;
+    const updates = { ...req.body }
+    delete updates.organizationId
 
     const reminder = await Reminder.findOneAndUpdate(
       { _id: req.params.id, organizationId: req.organizationId },
       { $set: updates },
       { new: true }
-    );
+    )
 
     if (!reminder) {
       return res.status(404).json({
         success: false,
-        error: 'Eslatma topilmadi'
-      });
+        error: 'Eslatma topilmadi',
+      })
     }
 
-    emitTenantEvent(req.organizationId, 'reminder:updated', reminder);
+    emitTenantEvent(req.organizationId, 'reminder:updated', reminder)
 
     res.json({
       success: true,
-      data: reminder
-    });
+      data: reminder,
+    })
   } catch (err) {
-    next(err);
+    next(err)
   }
-};
+}
 
 export const deleteReminder = async (req, res, next) => {
   try {
     const reminder = await Reminder.findOneAndDelete({
       _id: req.params.id,
-      organizationId: req.organizationId
-    });
+      organizationId: req.organizationId,
+    })
 
     if (!reminder) {
       return res.status(404).json({
         success: false,
-        error: 'Eslatma topilmadi'
-      });
+        error: 'Eslatma topilmadi',
+      })
     }
 
-    emitTenantEvent(req.organizationId, 'reminder:deleted', { id: req.params.id });
+    emitTenantEvent(req.organizationId, 'reminder:deleted', { id: req.params.id })
 
     res.json({
       success: true,
-      message: 'Eslatma o‘chirildi'
-    });
+      message: 'Eslatma o‘chirildi',
+    })
   } catch (err) {
-    next(err);
+    next(err)
   }
-};
+}

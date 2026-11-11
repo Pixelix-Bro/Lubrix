@@ -307,10 +307,10 @@ export const MessageLogSchema = new mongoose.Schema(
     customerName: { type: String },
     phone: { type: String },
     channel: { type: String, default: 'SMS' },
-    provider: { type: String, default: 'mock' },
+    provider: { type: String, required: true },
     providerMessageId: { type: String },
-    status: { type: String, default: 'sent' },
-    cost: { type: Number, default: 0 },
+    status: { type: String, required: true },
+    cost: { type: Number },
     sentAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
@@ -580,7 +580,7 @@ export const SmsCampaignSchema = new mongoose.Schema(
     message: { type: String, required: true },
     status: {
       type: String,
-      enum: ['DRAFT', 'SCHEDULED', 'SENDING', 'SENT', 'TESTED', 'FAILED'],
+      enum: ['DRAFT', 'SCHEDULED', 'SENDING', 'SENT', 'PARTIAL', 'FAILED'],
       default: 'DRAFT',
     },
     scheduledAt: { type: Date },

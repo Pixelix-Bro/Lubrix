@@ -6,11 +6,11 @@ import {
   SmsCampaign,
   SmsTemplate,
 } from '../../models/index.js'
-import { getSmsProvider, MockSmsAdapter } from './smsAdapter.js'
+import { getSmsProvider } from './smsAdapter.js'
 
 function fillTemplate(message, customer) {
   return String(message || '')
-    .replaceAll('{customer_name}', customer.fullName || 'Mijoz')
+    .replaceAll('{customer_name}', customer.fullName || '')
     .replaceAll('{phone}', customer.phoneE164 || '')
 }
 
@@ -112,25 +112,29 @@ export const CampaignController = {
           .status(400)
           .json({ success: false, error: 'Rozilik bermagan mijozlarga SMS yuborib bo‘lmaydi.' })
       }
+      if (scheduledAt) {
+        return res.status(501).json({
+          success: false,
+          error: 'Rejalashtirilgan kampaniyalar одоогоор дэмжигдээгүй байна',
+        })
+      }
+
+      const provider = getSmsProvider()
 
       const recipients = await recipientsForSegment(req.organizationId, segment)
+      if (recipients.length === 0) {
+        return res.status(400).json({ success: false, error: 'SMS roziligi bor mijoz topilmadi' })
+      }
       const campaign = await SmsCampaign.create({
         organizationId: req.organizationId,
         name: name || `Kampaniya ${new Date().toLocaleDateString('uz-UZ')}`,
         segment,
         message: message.trim(),
-        status: scheduledAt ? 'SCHEDULED' : 'SENDING',
-        scheduledAt: scheduledAt || null,
+        status: 'SENDING',
         recipientCount: recipients.length,
         createdBy: req.user?.name || req.userId,
       })
 
-      if (scheduledAt) {
-        return res.json({ success: true, data: campaign, message: 'Kampaniya navbatga qo‘yildi' })
-      }
-
-      const provider = getSmsProvider()
-      const testMode = provider instanceof MockSmsAdapter
       let sent = 0
       let failed = 0
       for (const customer of recipients) {
@@ -145,22 +149,22 @@ export const CampaignController = {
           customerName: customer.fullName,
           phone: customer.phoneE164,
           channel: 'SMS',
-          provider: process.env.SMS_PROVIDER || 'mock',
+          provider: provider.name,
           providerMessageId: result.providerMessageId,
-          status: testMode ? 'test' : result.success ? 'sent' : 'failed',
-          cost: result.cost || 0,
+          status: result.success ? 'sent' : 'failed',
+          cost: result.cost,
           sentAt: new Date(),
         })
         if (result.success) sent += 1
         else failed += 1
       }
 
-      campaign.status = testMode ? 'TESTED' : failed && !sent ? 'FAILED' : 'SENT'
+      campaign.status = sent === 0 ? 'FAILED' : failed > 0 ? 'PARTIAL' : 'SENT'
       campaign.sentCount = sent
       campaign.failedCount = failed
       await campaign.save()
 
-      res.json({ success: true, data: campaign, testMode })
+      res.json({ success: true, data: campaign })
     } catch (err) {
       next(err)
     }

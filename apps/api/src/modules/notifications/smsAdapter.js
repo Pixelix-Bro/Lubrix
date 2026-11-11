@@ -1,6 +1,6 @@
 /**
  * Lubrix SMS Adapter Interface
- * Istalgan SMS provayder (Eskiz, PlayMobile, Twilio, Mock) uchun yagona interfeys
+ * SMS provider integrations used by the API.
  */
 
 export class SmsAdapter {
@@ -9,29 +9,18 @@ export class SmsAdapter {
   }
 }
 
-export class MockSmsAdapter extends SmsAdapter {
-  constructor() {
-    super()
-    this.isMock = true
-  }
-
-  async sendSms({ organizationId }) {
-    const mockId = `mock_sms_${Date.now()}_${Math.floor(Math.random() * 1000)}`
-    console.info(
-      `[LUBRIX SMS MOCK] Simulated message for organization ${organizationId}; payload omitted`
-    )
-    return {
-      success: true,
-      providerMessageId: mockId,
-      status: 'sent',
-      cost: 0.005,
-    }
+export class SmsProviderConfigurationError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'SmsProviderConfigurationError'
+    this.statusCode = 503
   }
 }
 
 export class EskizSmsAdapter extends SmsAdapter {
   constructor(email, password, from = '4546') {
     super()
+    this.name = 'eskiz'
     this.email = email
     this.password = password
     this.from = from
@@ -76,11 +65,12 @@ export class EskizSmsAdapter extends SmsAdapter {
         body: formData,
       })
       const data = await res.json()
+      const success = data?.status === 'waiting' || data?.status === 'success'
       return {
-        success: data?.status === 'waiting' || data?.status === 'success',
+        success,
         providerMessageId: data?.id ? String(data.id) : null,
-        status: 'sent',
-        cost: 0.008,
+        status: success ? 'sent' : 'failed',
+        error: success ? undefined : data?.message || 'Eskiz SMS delivery failed',
       }
     } catch (err) {
       return { success: false, error: err.message, status: 'failed' }
@@ -89,13 +79,21 @@ export class EskizSmsAdapter extends SmsAdapter {
 }
 
 export const getSmsProvider = () => {
-  const provider = process.env.SMS_PROVIDER || 'mock'
-  if (provider === 'eskiz' && process.env.ESKIZ_EMAIL && process.env.ESKIZ_PASSWORD) {
+  const provider = process.env.SMS_PROVIDER?.trim().toLowerCase()
+  if (!provider) {
+    throw new SmsProviderConfigurationError('SMS_PROVIDER is not configured')
+  }
+
+  if (provider === 'eskiz') {
+    if (!process.env.ESKIZ_EMAIL || !process.env.ESKIZ_PASSWORD) {
+      throw new SmsProviderConfigurationError('Eskiz credentials are not configured')
+    }
     return new EskizSmsAdapter(
       process.env.ESKIZ_EMAIL,
       process.env.ESKIZ_PASSWORD,
       process.env.ESKIZ_SENDER_NAME
     )
   }
-  return new MockSmsAdapter()
+
+  throw new SmsProviderConfigurationError('Configured SMS provider is not supported')
 }

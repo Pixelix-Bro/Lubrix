@@ -2,6 +2,7 @@ import cors from 'cors'
 import express from 'express'
 import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
+import { timingSafeEqual } from 'node:crypto'
 import { getAllowedOrigins } from './config/cors.js'
 
 import { activityLogger } from './middleware/activityLogger.js'
@@ -42,6 +43,22 @@ app.use((req, res, next) => {
   const origin = req.headers.origin
   if (origin && !allowedOrigins.includes(origin)) {
     return res.status(403).json({ success: false, error: 'Origin ruxsat etilmagan' })
+  }
+  return next()
+})
+const ssrProxySecret = process.env.SSR_PROXY_SECRET
+if (process.env.NODE_ENV === 'production' && !ssrProxySecret) {
+  throw new Error('SSR_PROXY_SECRET must be configured in production')
+}
+app.use('/api/v1', (req, res, next) => {
+  const providedSecret = req.get('x-lubrix-ssr-secret') || ''
+  const expectedSecret = ssrProxySecret || ''
+  const provided = Buffer.from(providedSecret)
+  const expected = Buffer.from(expectedSecret)
+  const isTrustedProxy = provided.length === expected.length && timingSafeEqual(provided, expected)
+
+  if (!isTrustedProxy) {
+    return res.status(403).json({ success: false, error: 'SSR proxy required' })
   }
   return next()
 })
